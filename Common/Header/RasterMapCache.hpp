@@ -35,13 +35,65 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Units.hpp"
-#include "Waypointparser.h"
-#include "Logger.h"
-#include "Dialogs/dlgTools.h"
+#ifndef RASTERMAPCACHE_H
+#define RASTERMAPCACHE_H
 
-void dlgStatusSystemShowModal(void){
+#include "RasterMap.h"
+
+typedef struct _TERRAIN_CACHE
+{
+  short h;
+  long index;
+  unsigned int recency;
+} TERRAIN_CACHE;
 
 
-}
+class RasterMapCache: public RasterMap {
+ public:
+  RasterMapCache() {
+    terraincacheefficiency=0;
+    terraincachehits = 1;
+    terraincachemisses = 1;
+    cachetime = 0;
+    DirectAccess = false;
+    if (ref_count==0) {
+      fpTerrain = NULL;
+    }
+    ref_count++;
+  }
+
+  ~RasterMapCache() {
+    ref_count--;
+  }
+
+  // shared!
+  static ZZIP_FILE *fpTerrain;
+  static int ref_count;
+
+  void ServiceCache();
+
+  virtual bool Open(char* filename);
+  virtual void Close();
+  virtual void LockRead();
+
+ protected:
+  TERRAIN_CACHE TerrainCache[MAXTERRAINCACHE];
+
+  int terraincacheefficiency;
+  long terraincachehits;
+  long terraincachemisses;
+  unsigned int cachetime;
+  int SortThresold;
+
+  short _GetFieldAtXY(unsigned int lx,
+                      unsigned int ly);
+  void OptimiseCache(void);
+  void SetCacheTime();
+  void ClearTerrainCache();
+  short LookupTerrainCache(const long &SeekPos);
+  short LookupTerrainCacheFile(const long &SeekPos);
+  //
+  virtual void _Close();
+};
+
+#endif

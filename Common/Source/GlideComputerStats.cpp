@@ -90,7 +90,7 @@ bool GlideComputerStats::DoLogging() {
   }
 
   if (log_clock.check_advance(Basic().Time)) {
-    LogPoint(Basic());
+    logger.LogPoint(Basic());
   }
 
   /* JMW TODO update this code incomplete
@@ -146,7 +146,7 @@ void GlideComputerStats::SaveTaskSpeed(double val)
 
 void GlideComputerStats::SetLegStart() 
 {
-  flightstats.SetLegStart(ActiveTaskPoint, Basic().Time);
+  flightstats.SetLegStart(task.getActiveIndex(), Basic().Time);
 }
 
 

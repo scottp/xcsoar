@@ -35,13 +35,10 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Interface.hpp"
+#include "Dialogs/Internal.hpp"
 #include "Units.hpp"
 #include "InputEvents.h"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
-#include "MainWindow.hpp"
 #include "Compatibility/string.h"
 
 static WndForm *wf=NULL;
@@ -59,7 +56,10 @@ static CallBackTableEntry_t CallBackTable[]={
 
 
 
-void dlgHelpShowModal(const TCHAR* Caption, const TCHAR* HelpText) {
+void
+dlgHelpShowModal(ContainerWindow &parent,
+                 const TCHAR* Caption, const TCHAR* HelpText)
+{
   if (!Caption || !HelpText) {
     return;
   }
@@ -67,12 +67,12 @@ void dlgHelpShowModal(const TCHAR* Caption, const TCHAR* HelpText) {
   if (!InfoBoxLayout::landscape) {
     wf = dlgLoadFromXML(CallBackTable,
                         TEXT("dlgHelp_L.xml"),
-                        XCSoarInterface::main_window,
+                        parent,
                         TEXT("IDR_XML_HELP_L"));
   } else {
     wf = dlgLoadFromXML(CallBackTable,
                         TEXT("dlgHelp.xml"),
-                        XCSoarInterface::main_window,
+                        parent,
                         TEXT("IDR_XML_HELP"));
   }
   WndProperty* wp;

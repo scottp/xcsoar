@@ -35,10 +35,22 @@ Copyright_License {
 }
 */
 
-#include "MapWindow.h"
-#include "XCSoar.h" // for Appearance
-#include "InfoBoxLayout.h"
-#include "Screen/Util.hpp"
-#include "Screen/Graphics.hpp"
-#include "Screen/Fonts.hpp"
+/*
+ * This header is included by all dialog sources, and includes all
+ * headers which are common to all dialog implementations.
+ *
+ */
 
+#ifndef XCSOAR_DIALOGS_INTERNAL_HPP
+#define XCSOAR_DIALOGS_INTERNAL_HPP
+
+#include "Dialogs.h"
+#include "Dialogs/dlgTools.h"
+#include "Dialogs/XML.hpp"
+#include "Dialogs/dlgHelpers.hpp"
+#include "WindowControls.h"
+#include "Language.hpp"
+#include "WindowControls.h"
+#include "Interface.hpp"
+
+#endif

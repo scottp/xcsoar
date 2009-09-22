@@ -191,14 +191,15 @@ public:
 protected:
 
   bool CheckCondition(const GlideComputer& cmp) {
-    if (!cmp.Calculated().Flying || !ValidTask()) {
+    if (!cmp.Calculated().Flying || !task.Valid()) {
       return false;
     }
 
     tad = cmp.Calculated().TaskAltitudeDifference*0.2+0.8*tad;
 
     bool BeforeFinalGlide =
-      (ValidTaskPoint(ActiveTaskPoint+1) && !cmp.Calculated().FinalGlide);
+      (task.ValidTaskPoint(task.getActiveIndex()+1) 
+       && !cmp.Calculated().FinalGlide);
 
     if (BeforeFinalGlide) {
       Interval_Notification = 60*5;
@@ -255,20 +256,16 @@ protected:
   SunEphemeris sun;
 
   bool CheckCondition(const GlideComputer& cmp) {
-    if (!ValidTask() || !cmp.Calculated().Flying) {
+    if (!task.Valid() || !cmp.Calculated().Flying) {
       return false;
     }
 
-    mutexTaskData.Lock();
-
     double sunsettime = sun.CalcSunTimes
-      (way_points.get(task_points[ActiveTaskPoint].Index).Location,
+      (task.getActiveLocation(),
        cmp.Basic(), cmp.Calculated(), GetUTCOffset()/3600);
     double d1 = (cmp.Calculated().TaskTimeToGo
 		 +DetectCurrentTime(&cmp.Basic()))/3600;
     double d0 = (DetectCurrentTime(&cmp.Basic()))/3600;
-
-    mutexTaskData.Unlock();
 
     bool past_sunset = (d1>sunsettime) && (d0<sunsettime);
 
@@ -300,12 +297,12 @@ public:
 protected:
 
   bool CheckCondition(const GlideComputer& cmp) {
-    if (!AATEnabled || !ValidTask() || TaskIsTemporary()
+    if (!task.getSettings().AATEnabled || !task.Valid() || task.TaskIsTemporary()
         || !(cmp.Calculated().ValidStart && !cmp.Calculated().ValidFinish)
         || !cmp.Calculated().Flying) {
       return false;
     }
-    bool OnFinalWaypoint = !ValidTask();
+    bool OnFinalWaypoint = !task.Valid();
     if (OnFinalWaypoint) {
       // can't do much about it now, so don't give a warning
       return false;
@@ -338,15 +335,15 @@ public:
 protected:
 
   bool CheckCondition(const GlideComputer& cmp) {
-    if (!ValidTask() || !cmp.Calculated().Flying
-        || (ActiveTaskPoint>0) || !ValidTaskPoint(ActiveTaskPoint+1)) {
+    if (!task.Valid() || !cmp.Calculated().Flying
+        || (task.getActiveIndex()>0) || !task.ValidTaskPoint(task.getActiveIndex()+1)) {
       return false;
     }
-    if (cmp.Calculated().LegDistanceToGo>StartRadius) {
+    if (cmp.Calculated().LegDistanceToGo>task.getSettings().StartRadius) {
       return false;
     }
-    if (cmp.ValidStartSpeed(StartMaxSpeedMargin) 
-	&& cmp.InsideStartHeight(StartMaxHeightMargin))
+    if (cmp.ValidStartSpeed(task.getSettings().StartMaxSpeedMargin) 
+	&& cmp.InsideStartHeight(task.getSettings().StartMaxHeightMargin))
     {
       withinMargin = true;
     } else {
@@ -383,7 +380,7 @@ public:
 protected:
 
   bool CheckCondition(const GlideComputer& cmp) {
-    if (!cmp.Calculated().Flying || !ValidTask()) {
+    if (!cmp.Calculated().Flying || !task.Valid()) {
       return false;
     }
 

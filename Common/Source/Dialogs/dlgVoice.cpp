@@ -35,18 +35,13 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Dialogs.h"
-#include "Language.hpp"
+#include "Dialogs/Internal.hpp"
 #include "Units.hpp"
-#include "InputEvents.h"
-#include "Dialogs/dlgTools.h"
 #include "UtilsProfile.hpp"
 #include "Registry.hpp"
 #include "Audio/VegaVoice.h"
 #include "DataField/Base.hpp"
 #include "MainWindow.hpp"
-#include "Settings.hpp"
 
 static WndForm *wf=NULL;
 

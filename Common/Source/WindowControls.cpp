@@ -50,7 +50,6 @@ Copyright_License {
 #include "Screen/Animation.hpp"
 #include "Screen/Fonts.hpp"
 #include "Screen/Viewport.hpp"
-#include "Screen/PaintCanvas.hpp"
 #include "DataField/Base.hpp"
 #include "resource.h"
 
@@ -92,7 +91,6 @@ void DrawLine(Canvas &canvas, int x1, int y1, int x2, int y2) {
   canvas.line(x1, y1, x2, y2);
 }
 
-extern int dlgComboPicker(WndProperty* theProperty);
 #ifdef GNAV
 #define ENABLECOMBO false // master on/off for combo popup
 #else
@@ -202,11 +200,6 @@ WindowControl::WindowControl(WindowControl *Owner,
   if (mOwner != NULL)
     mOwner->AddClient(this);
 
-  mBoundRect.top = 0;
-  mBoundRect.left = 0;
-  mBoundRect.right = GetWidth();
-  mBoundRect.bottom = GetHeight();
-
   install_wndproc();
 
   mBorderSize = 1;
@@ -256,12 +249,6 @@ void WindowControl::Destroy(void){
 }
 
 void WindowControl::UpdatePosSize(void){
-
-  mBoundRect.top = 0;
-  mBoundRect.left = 0;
-  mBoundRect.right = GetWidth();
-  mBoundRect.bottom = GetHeight();
-
   move(mX, mY, mWidth, mHeight);
 }
 
@@ -402,7 +389,7 @@ void WindowControl::SetCaption(const TCHAR *Value){
 
     _tcscpy(mCaption, Value);
 
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
 
@@ -470,7 +457,7 @@ bool WindowControl::SetVisible(bool Value){
     */
 
     if (mVisible){
-      update(*GetBoundRect());
+      update(get_client_rect());
       update();
       show();
     } else {
@@ -493,7 +480,7 @@ int WindowControl::SetBorderKind(int Value){
   int res = mBorderKind;
   if (mBorderKind != Value){
     mBorderKind = Value;
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
   return(res);
@@ -569,24 +556,17 @@ WindowControl::PaintSelector(Canvas &canvas)
 
 void WindowControl::Redraw(void){
   if (GetVisible()){
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
 }
-
-
-#ifdef ALTAIRSYNC
-#else
-extern void dlgHelpShowModal(const TCHAR* Caption, const TCHAR* HelpText);
-#endif
-
 
 int WindowControl::OnHelp() {
 #ifdef ALTAIRSYNC
     return(0); // undefined. return 1 if defined
 #else
     if (mHelpText) {
-      dlgHelpShowModal(mCaption, mHelpText);
+      dlgHelpShowModal(XCSoarInterface::main_window, mCaption, mHelpText);
       return(1);
     } else {
       if (mOnHelpCallback) {
@@ -644,7 +624,7 @@ WindowControl::on_paint(Canvas &canvas)
 
   // JMW added highlighting, useful for lists
   if (!mDontPaintSelector && mCanFocus && mHasFocus){
-    Color ff = (GetBackColor()+0x00ffffff*3)/4;
+    Color ff = GetBackColor().highlight();
     Brush brush(ff);
     rc.left += 0;
     rc.right -= 2;
@@ -728,6 +708,8 @@ WindowControl *WindowControl::FocusPrev(WindowControl *Sender){
   return(NULL);
 }
 
+#ifndef ENABLE_SDL
+
 LRESULT
 WindowControl::on_message(HWND hwnd, UINT uMsg,
                           WPARAM wParam, LPARAM lParam)
@@ -763,6 +745,7 @@ WindowControl::on_message(HWND hwnd, UINT uMsg,
   return ContainerWindow::on_message(hwnd, uMsg, wParam, lParam);
 }
 
+#endif /* !ENABLE_SDL */
 
 void InitWindowControlModule(void){
 
@@ -948,6 +931,9 @@ int WndForm::ShowModal(bool bEnableMap) {
   bool hastimed = false;
   WndForm::timeAnyOpenClose.update(); // when current dlg opens or child closes
 
+#ifdef ENABLE_SDL
+  // XXX
+#else /* !ENABLE_SDL */
   while ((mModalResult == 0) && GetMessage(&msg, NULL, 0, 0)) {
 //hack!
 
@@ -1099,6 +1085,7 @@ int WndForm::ShowModal(bool bEnableMap) {
 #endif
     }
   } // End Modal Loop
+#endif /* !ENABLE_SDL */
 
   // static.  this is current open/close or child open/close
   WndForm::timeAnyOpenClose.update();
@@ -1128,18 +1115,16 @@ int WndForm::ShowModal(bool bEnableMap) {
 void
 WndForm::on_paint(Canvas &canvas)
 {
-
-  RECT rcClient;
   SIZE tsize;
 
   if (!GetVisible()) return;
 
-  CopyRect(&rcClient, GetBoundRect());
+  RECT rcClient = get_client_rect();
 
   canvas.select(GetBorderPen());
   canvas.select(GetBackBrush());
 
-  DrawEdge(canvas, &rcClient, EDGE_RAISED, BF_ADJUST | BF_FLAT | BF_RECT);
+  canvas.raised_edge(rcClient);
 
   canvas.set_text_color(GetForeColor());
   canvas.set_background_color(mColorTitle);
@@ -1156,10 +1141,8 @@ WndForm::on_paint(Canvas &canvas)
   rcClient.top += tsize.cy;
 
   if (mClientWindow && !EqualRect(&mClientRect, &rcClient)){
-
-    SetWindowPos(mClientWindow->GetHandle(), HWND_TOP,
-      rcClient.left, rcClient.top, rcClient.right-rcClient.left, rcClient.bottom-rcClient.top,
-      0);
+    mClientWindow->move(rcClient.left, rcClient.top);
+    mClientWindow->insert_after(HWND_TOP, true);
 
     CopyRect(&mClientRect, &rcClient);
 
@@ -1358,7 +1341,8 @@ WndButton::on_mouse_up(int x, int y)
 
   //POINTSTOPOINT(Pos, MAKEPOINTS(lParam));
 
-  if (PtInRect(GetBoundRect(), Pos)){
+  const RECT client_rect = get_client_rect();
+  if (PtInRect(&client_rect, Pos)){
     if (mOnClickNotify != NULL) {
       RECT mRc = get_position();
       SetSourceRectangle(mRc);
@@ -1410,8 +1394,7 @@ WndButton::on_key_up(unsigned key_code)
         mDown = false;
         on_paint(get_canvas());
         if (mOnClickNotify != NULL) {
-          RECT mRc;
-          GetWindowRect(GetHandle(), &mRc);
+          RECT mRc = get_position();
           SetSourceRectangle(mRc);
           (mOnClickNotify)(this);
         }
@@ -1430,10 +1413,10 @@ WndButton::on_mouse_down(int x, int y)
   if (!GetFocused())
     set_focus();
   else {
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
-  SetCapture(GetHandle());
+  set_capture();
   return true;
 }
 
@@ -1442,9 +1425,9 @@ WndButton::on_mouse_double(int x, int y)
 {
   (void)x; (void)y;
   mDown = true;
-  update(*GetBoundRect());
+  update(get_client_rect());
   update();
-  SetCapture(GetHandle());
+  set_capture();
   return true;
 }
 
@@ -1452,23 +1435,16 @@ WndButton::on_mouse_double(int x, int y)
 void
 WndButton::on_paint(Canvas &canvas)
 {
-
-  RECT rc;
-
   if (!GetVisible()) return;
 
   WindowControl::on_paint(canvas);
 
-  CopyRect(&rc, GetBoundRect());
+  RECT rc = get_client_rect();
   InflateRect(&rc, -2, -2); // todo border width
 
   // JMW todo: add icons?
 
-  if (mDown){
-    DrawFrameControl(canvas, &rc, DFC_BUTTON, DFCS_BUTTONPUSH | DFCS_PUSHED);
-  }else{
-    DrawFrameControl(canvas, &rc, DFC_BUTTON, DFCS_BUTTONPUSH);
-  }
+  canvas.draw_button(rc, mDown);
 
   if (mCaption != NULL && mCaption[0] != '\0'){
     canvas.set_text_color(GetForeColor());
@@ -1477,15 +1453,14 @@ WndButton::on_paint(Canvas &canvas)
 
     canvas.select(*GetFont());
 
-    CopyRect(&rc, GetBoundRect());
+    rc = get_client_rect();
     InflateRect(&rc, -2, -2); // todo border width
 
     if (mDown)
       OffsetRect(&rc, 2, 2);
 
     if (mLastDrawTextHeight < 0){
-
-      DrawText(canvas, mCaption, _tcslen(mCaption), &rc,
+      canvas.formatted_text(&rc, mCaption,
           DT_CALCRECT
         | DT_EXPANDTABS
         | DT_CENTER
@@ -1495,7 +1470,7 @@ WndButton::on_paint(Canvas &canvas)
 
       mLastDrawTextHeight = rc.bottom - rc.top;
       // DoTo optimize
-      CopyRect(&rc, GetBoundRect());
+      rc = get_client_rect();
       InflateRect(&rc, -2, -2); // todo border width
       if (mDown)
         OffsetRect(&rc, 2, 2);
@@ -1504,7 +1479,7 @@ WndButton::on_paint(Canvas &canvas)
 
     rc.top += ((GetHeight()-4-mLastDrawTextHeight)/2);
 
-    DrawText(canvas, mCaption, _tcslen(mCaption), &rc,
+    canvas.formatted_text(&rc, mCaption,
         DT_EXPANDTABS
       | DT_CENTER
       | DT_NOCLIP
@@ -1562,11 +1537,15 @@ WndProperty::Editor::on_key_down(unsigned key_code)
   }
 
   if (key_code == VK_UP || key_code == VK_DOWN){
+#ifdef ENABLE_SDL
+    // XXX
+#else /* !ENABLE_SDL */
     WindowControl *owner = parent->GetOwner();
     if (owner != NULL)
       // XXX what's the correct lParam value here?
       PostMessage(owner->GetClientAreaWindow(),
                   WM_KEYDOWN, key_code, 0);
+#endif /* !ENABLE_SDL */
     // pass the message to the parent window;
     return true;
   }
@@ -1594,6 +1573,9 @@ WndProperty::Editor::on_key_up(unsigned key_code)
   return false;
 }
 
+#ifdef ENABLE_SDL
+// XXX
+#else /* !ENABLE_SDL */
 LRESULT
 WndProperty::Editor::on_message(HWND hWnd, UINT message,
                                 WPARAM wParam, LPARAM lParam)
@@ -1621,6 +1603,7 @@ WndProperty::Editor::on_message(HWND hWnd, UINT message,
 
   return EditWindow::on_message(hWnd, message, wParam, lParam);
 }
+#endif /* !ENABLE_SDL */
 
 
 Bitmap WndProperty::hBmpLeft32;
@@ -1772,7 +1755,7 @@ int WndProperty::SetButtonSize(int Value){
     edit.move(mEditPos.x, mEditPos.y, mEditSize.x, mEditSize.y);
 
     if (GetVisible()){
-      update(*GetBoundRect());
+      update(get_client_rect());
       update();
     }
   }
@@ -1793,7 +1776,9 @@ bool WndProperty::SetReadOnly(bool Value){
 }
 
 bool WndProperty::SetFocused(bool Value, HWND FromTo){
-
+#ifdef ENABLE_SDL
+  // XXX
+#else /* !ENABLE_SDL */
   const HWND mhEdit = edit;
   TCHAR sTmp[128];
 
@@ -1818,6 +1803,7 @@ bool WndProperty::SetFocused(bool Value, HWND FromTo){
 
   if (FromTo != mhEdit)
     WindowControl::SetFocused(Value, FromTo);
+#endif /* !ENABLE_SDL */
   if (Value){
     edit.set_focus();
     edit.set_selection();
@@ -1864,7 +1850,7 @@ WndProperty::on_mouse_down(int x, int y)
   {
     if (!GetReadOnly())  // when they click on the label
     {
-      dlgComboPicker(this);
+      dlgComboPicker(XCSoarInterface::main_window, this);
     }
     else
     {
@@ -2143,21 +2129,18 @@ WndFrame::on_paint(Canvas &canvas)
   WindowControl::on_paint(canvas);
 
   if (mCaption != 0){
-
-    RECT rc;
-
     canvas.set_text_color(GetForeColor());
     canvas.set_background_color(GetBackColor());
     canvas.background_transparent();
 
     canvas.select(*GetFont());
 
-    CopyRect(&rc, GetBoundRect());
+    RECT rc = get_client_rect();
     InflateRect(&rc, -2, -2); // todo border width
 
 //    h = rc.bottom - rc.top;
 
-    DrawText(canvas, mCaption, _tcslen(mCaption), &rc,
+    canvas.formatted_text(&rc, mCaption,
       mCaptionStyle // | DT_CALCRECT
     );
   }
@@ -2169,7 +2152,7 @@ void WndFrame::SetCaption(const TCHAR *Value){
 
   if (_tcscmp(mCaption, Value) != 0){
     _tcscpy(mCaption, Value);  // todo size check
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
 }
@@ -2179,7 +2162,7 @@ UINT WndFrame::SetCaptionStyle(UINT Value){
   if (res != Value){
     mCaptionStyle = Value;
 
-    update(*GetBoundRect());
+    update(get_client_rect());
     update();
   }
   return(res);
@@ -2188,13 +2171,12 @@ UINT WndFrame::SetCaptionStyle(UINT Value){
 unsigned
 WndFrame::GetTextHeight()
 {
-  RECT rc;
-  ::CopyRect(&rc, GetBoundRect());
+  RECT rc = get_client_rect();
   ::InflateRect(&rc, -2, -2); // todo border width
 
   Canvas &canvas = GetCanvas();
   canvas.select(*GetFont());
-  ::DrawText(canvas, mCaption, -1, &rc, mCaptionStyle | DT_CALCRECT);
+  canvas.formatted_text(&rc, mCaption, mCaptionStyle | DT_CALCRECT);
 
   return rc.bottom - rc.top;
 }
@@ -2390,7 +2372,7 @@ void WndListFrame::DrawScrollBar(Canvas &canvas) {
   if (!hScrollBarBitmapFill.defined())
     hScrollBarBitmapFill.load(IDB_SCROLLBARFILL);
 
-  Brush brush(0xFFFFFF);
+  Brush brush(Color(0xff, 0xff, 0xff));
   Pen pen(DEFAULTBORDERPENWIDTH, GetForeColor());
   canvas.select(pen);
 
@@ -2714,7 +2696,7 @@ WndFrame::on_mouse_down(int xPos, int yPos)
       //return(1);
     }
     //else {  // always doing this allows selected item in list to remain selected.
-      update(*GetBoundRect());
+      update(get_client_rect());
       update();
     //}
 

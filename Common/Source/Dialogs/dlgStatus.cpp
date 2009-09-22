@@ -35,12 +35,9 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include "Dialogs.h"
-#include "Language.hpp"
 #include "Blackboard.hpp"
-#include "Settings.hpp"
 #include "SettingsTask.hpp"
 #include "Math/Earth.hpp"
 #include "Battery.h"
@@ -57,8 +54,6 @@ Copyright_License {
 #include "Components.hpp"
 
 #include <assert.h>
-
-#include "Dialogs/dlgTools.h"
 
 static WndForm *wf=NULL;
 static bool multi_page = false;
@@ -153,8 +148,8 @@ static void UpdateValuesSystem() {
   static int SatellitesUsed_last = XCSoarInterface::Basic().SatellitesUsed;
   static int VarioAvailable_last = XCSoarInterface::Basic().VarioAvailable;
   static int FLARM_Available_last = XCSoarInterface::Basic().FLARM_Available;
-  static bool LoggerActive_last = isLoggerActive();
-  static bool DeclaredToDevice_last = isTaskDeclared();
+  static bool LoggerActive_last = logger.isLoggerActive();
+  static bool DeclaredToDevice_last = logger.isTaskDeclared();
   static double SupplyBatteryVoltage_last = XCSoarInterface::Basic().SupplyBatteryVoltage;
   static int PDABatteryPercent_last = PDABatteryPercent;
 
@@ -164,8 +159,8 @@ static void UpdateValuesSystem() {
       (SatellitesUsed_last != XCSoarInterface::Basic().SatellitesUsed) ||
       (VarioAvailable_last != XCSoarInterface::Basic().VarioAvailable) ||
       (FLARM_Available_last != XCSoarInterface::Basic().FLARM_Available) ||
-      (LoggerActive_last != isLoggerActive()) ||
-      (DeclaredToDevice_last != isTaskDeclared()) ||
+      (LoggerActive_last != logger.isLoggerActive()) ||
+      (DeclaredToDevice_last != logger.isTaskDeclared()) ||
       (SupplyBatteryVoltage_last != XCSoarInterface::Basic().SupplyBatteryVoltage) ||
       (PDABatteryPercent_last != PDABatteryPercent)) {
     first = false;
@@ -175,8 +170,8 @@ static void UpdateValuesSystem() {
     SatellitesUsed_last = XCSoarInterface::Basic().SatellitesUsed;
     VarioAvailable_last = XCSoarInterface::Basic().VarioAvailable;
     FLARM_Available_last = XCSoarInterface::Basic().FLARM_Available;
-    LoggerActive_last = isLoggerActive();
-    DeclaredToDevice_last = isTaskDeclared();
+    LoggerActive_last = logger.isLoggerActive();
+    DeclaredToDevice_last = logger.isTaskDeclared();
     SupplyBatteryVoltage_last = XCSoarInterface::Basic().SupplyBatteryVoltage;
     PDABatteryPercent_last = PDABatteryPercent;
 
@@ -240,16 +235,16 @@ static void UpdateValuesSystem() {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpLogger"));
   if (wp) {
-    LinkGRecordDLL();
-    if (LoggerGActive()) {
-      if (isLoggerActive()) {
+    logger.LinkGRecordDLL();
+    if (logger.LoggerGActive()) {
+      if (logger.isLoggerActive()) {
         wp->SetText(gettext(TEXT("ON (G)")));
       } else {
         wp->SetText(gettext(TEXT("OFF (G)")));
       }
     }
     else { // no G Record
-      if (isLoggerActive()) {
+      if (logger.isLoggerActive()) {
         wp->SetText(gettext(TEXT("ON (no G)")));
       } else {
         wp->SetText(gettext(TEXT("OFF (no G)")));
@@ -260,7 +255,7 @@ static void UpdateValuesSystem() {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpDeclared"));
   if (wp) {
-    if (isTaskDeclared()) {
+    if (logger.isTaskDeclared()) {
       wp->SetText(gettext(TEXT("YES")));
     } else {
       wp->SetText(gettext(TEXT("NO")));
@@ -477,19 +472,12 @@ static void UpdateValuesRules(void) {
   }
   // StartMaxHeight, StartMaxSpeed;
 
-  //  double start_h;
-  mutexTaskData.Lock();
-
   wp = (WndProperty*)wf->FindByName(TEXT("prpStartPoint"));
-
-  if (ValidTaskPoint(0)) {
-    //    start_h = WayPointList[task_points[0].Index].Altitude;
-    if (wp) {
-      wp->SetText(way_points.get(task_points[0].Index).Name);
-    }
-  } else {
-    //    start_h = 0;
-    if (wp) {
+  if (wp) {
+    int wp_index = task.getWaypointIndex(0);
+    if (wp_index>=0) {
+      wp->SetText(way_points.get(wp_index).Name);
+    } else {
       wp->SetText(TEXT(""));
     }
   }
@@ -517,7 +505,6 @@ static void UpdateValuesRules(void) {
     wp->SetText(Temp);
   }
 
-  mutexTaskData.Unlock();
 }
 
 
@@ -526,9 +513,9 @@ static void UpdateValuesTask(void) {
   TCHAR Temp[80];
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpTaskTime"));
-  Units::TimeToText(Temp, (int)AATTaskLength*60);
+  Units::TimeToText(Temp, (int)task.getSettings().AATTaskLength*60);
   if (wp) {
-    if (!AATEnabled) {
+    if (!task.getSettings().AATEnabled) {
       wp->SetVisible(false);
     } else {
       wp->SetText(Temp);
@@ -563,7 +550,7 @@ static void UpdateValuesTask(void) {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpRemainingDistance"));
   if (wp) {
-    if (AATEnabled) {
+    if (task.getSettings().AATEnabled) {
       _stprintf(Temp, TEXT("%.0f %s"),
                 DISTANCEMODIFY*XCSoarInterface::Calculated().AATTargetDistance,
                 Units::GetDistanceName());

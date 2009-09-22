@@ -51,6 +51,7 @@ Copyright_License {
 #include "Math/Geometry.hpp"
 #include "Math/FastMath.h"
 #include "RasterTerrain.h"
+#include "RasterMap.h"
 #include "Calibration.hpp"
 #include "Airspace.h"
 #include "AirspaceWarning.h"
@@ -63,7 +64,6 @@ Copyright_License {
 #include "Interface.hpp"
 #include "Atmosphere.h"
 #include "LogFile.hpp"
-#include "Settings.hpp"
 #include "GPSClock.hpp"
 
 #define TAKEOFFSPEEDTHRESHOLD (0.5*GlidePolar::Vminsink)
@@ -74,10 +74,6 @@ void
 DoAutoQNH(const NMEA_INFO *Basic, const DERIVED_INFO *Calculated);
 
 ////
-#define CRUISE 0
-#define WAITCLIMB 1
-#define CLIMB 2
-#define WAITCRUISE 3
 
 #define MinTurnRate  4
 #define CruiseClimbSwitch 15
@@ -540,8 +536,8 @@ void GlideComputerAirData::TerrainHeight()
 
   terrain.Lock();
   // want most accurate rounding here
-  terrain.SetTerrainRounding(0,0);
-  Alt = terrain.GetTerrainHeight(Basic().Location);
+  RasterRounding rounding(*terrain.GetMap(),0,0);
+  Alt = terrain.GetTerrainHeight(Basic().Location, rounding);
   terrain.Unlock();
 
   if(Alt<0) {
@@ -639,7 +635,7 @@ GlideComputerAirData::SpeedToFly(const double mc_setting,
 
     double VOptnew;
 
-    if (!ValidTask() || !Calculated().FinalGlide) {
+    if (!task.Valid() || !Calculated().FinalGlide) {
       // calculate speed as if cruising, wind has no effect on opt speed
       GlidePolar::MacCreadyAltitude(delta_mc,
                                     100.0, // dummy value
@@ -767,7 +763,8 @@ GlideComputerAirData::ProcessIdle()
 {
   BallastDump();
   TerrainFootprint(MapProjection().GetScreenDistanceMeters());
-  if (airspace_clock.check_advance(Basic().Time)) {
+  if (airspace_clock.check_advance(Basic().Time) 
+      && SettingsComputer().EnableAirspaceWarnings) {
     AirspaceWarning();
   }
 }
@@ -876,19 +873,21 @@ GlideComputerAirData::PredictNextPosition()
   if(Calculated().Circling) {
     SetCalculated().NextLocation = Basic().Location;
     SetCalculated().NextAltitude =
-      Calculated().NavAltitude + Calculated().Average30s * WarningTime;
+      Calculated().NavAltitude + Calculated().Average30s * SettingsComputer().WarningTime;
  } else {
     FindLatitudeLongitude(Basic().Location,
 			  Basic().TrackBearing,
-			  Basic().Speed*WarningTime,
+			  Basic().Speed*SettingsComputer().WarningTime,
 			  &SetCalculated().NextLocation);
 
     if (Basic().BaroAltitudeAvailable) {
       SetCalculated().NextAltitude =
-	Basic().BaroAltitude + Calculated().Average30s * WarningTime;
+	Basic().BaroAltitude + Calculated().Average30s 
+        * SettingsComputer().WarningTime;
     } else {
       SetCalculated().NextAltitude =
-	Calculated().NavAltitude + Calculated().Average30s * WarningTime;
+	Calculated().NavAltitude + Calculated().Average30s 
+        * SettingsComputer().WarningTime;
     }
   }
   // MJJ TODO Predict terrain altitude
@@ -904,9 +903,6 @@ void
 GlideComputerAirData::AirspaceWarning()
 {
   unsigned int i;
-
-  if(!AIRSPACEWARNINGS)
-      return;
 
   static bool position_is_predicted = false;
 
@@ -952,10 +948,12 @@ GlideComputerAirData::AirspaceWarning()
            || ((AirspaceCircle[i].Top.Base == abAGL) 
 	       && (agl < AirspaceCircle[i].Top.AGL)))) {
 
-        if ((iAirspaceMode[AirspaceCircle[i].Type] >= 2) &&
+        if ((SettingsComputer().iAirspaceMode[AirspaceCircle[i].Type] >= 2) &&
 	    InsideAirspaceCircle(loc, i)) {
 
-          AirspaceWarnListAdd(&Basic(), &Calculated(), MapProjection(),
+          AirspaceWarnListAdd(&Basic(), &Calculated(), 
+                              &SettingsComputer(),
+                              MapProjection(),
                               position_is_predicted, 1, i, false);
         }
       }
@@ -976,17 +974,21 @@ GlideComputerAirData::AirspaceWarning()
            || ((AirspaceArea[i].Top.Base == abAGL) 
 	       && (agl < AirspaceArea[i].Top.AGL)))) {
 
-        if ((iAirspaceMode[AirspaceArea[i].Type] >= 2)
+        if ((SettingsComputer().iAirspaceMode[AirspaceArea[i].Type] >= 2)
             && InsideAirspaceArea(loc, i)){
 
-          AirspaceWarnListAdd(&Basic(), &Calculated(), map_projection,
+          AirspaceWarnListAdd(&Basic(), &Calculated(), 
+                              &SettingsComputer(),
+                              map_projection,
                               position_is_predicted, 0, i, false);
         }
       }
     }
   }
 
-  AirspaceWarnListProcess(&Basic(), &Calculated(), map_projection);
+  AirspaceWarnListProcess(&Basic(), &Calculated(), 
+                          &SettingsComputer(),
+                          map_projection);
 }
 
 
@@ -1017,7 +1019,8 @@ GlideComputerAirData::TerrainFootprint(double screen_range)
 					&Calculated(), 
 					SettingsComputer(),
 					&loc,
-					mymaxrange, &out_of_range,
+					mymaxrange, 
+                                        &out_of_range,
 					&SetCalculated().TerrainBase);
     if (out_of_range) {
       FindLatitudeLongitude(Basic().Location,

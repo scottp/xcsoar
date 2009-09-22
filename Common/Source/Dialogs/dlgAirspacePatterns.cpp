@@ -35,10 +35,7 @@ Copyright_License {
 }
 */
 
-
-#include "XCSoar.h"
-#include "Interface.hpp"
-#include "Dialogs/dlgTools.h"
+#include "Dialogs/Internal.hpp"
 #include "InfoBoxLayout.h"
 #include "Screen/Graphics.hpp"
 #include "MainWindow.hpp"
@@ -70,11 +67,10 @@ OnAirspacePatternsPaintListItem(WindowControl *Sender, Canvas &canvas)
     canvas.set_background_color(Color(0xFF, 0xFF, 0xFF));
     canvas.select(MapGfx.GetAirspaceBrush(i));
     canvas.set_text_color(Color(0x00,0x00, 0x00));
-    Rectangle(canvas,
-              100*InfoBoxLayout::scale,
-              2*InfoBoxLayout::scale,
-              180*InfoBoxLayout::scale,
-              22*InfoBoxLayout::scale);
+    canvas.rectangle(100 * InfoBoxLayout::scale,
+                     2 * InfoBoxLayout::scale,
+                     180 * InfoBoxLayout::scale,
+                     22 * InfoBoxLayout::scale);
   }
 }
 

@@ -35,10 +35,7 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Dialogs.h"
-#include "Language.hpp"
-#include "Dialogs/dlgTools.h"
+#include "Dialogs/Internal.hpp"
 #include "Registry.hpp"
 #include "DataField/Boolean.hpp"
 #include "DataField/Enum.hpp"
@@ -132,7 +129,11 @@ static void RedrawSampleFont(void)
     }
   }
 
+#ifdef ENABLE_SDL
+  // XXX
+#else /* !ENABLE_SDL */
   NewFont.set(&NewLogFont);
+#endif /* !ENABLE_SDL */
 
   if ( _tcscmp(OriginalFontRegKey, szRegistryFontMapWindowBoldFont) == 0 ) {
     wf->SetFont(NewFont);

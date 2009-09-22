@@ -40,14 +40,13 @@ Copyright_License {
 #include "XCSoar.h"
 #include "Protection.hpp"
 #include "McReady.h"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
+#include "Task.h"
 #include "RasterTerrain.h"
+#include "RasterMap.h"
 #include "Math/FastMath.h"
 #include "Math/Earth.hpp"
-#include "WayPoint.hpp"
-#include "WayPointList.hpp"
 #include "Components.hpp"
 #include "NMEA/Info.h"
 #include "NMEA/Derived.hpp"
@@ -105,12 +104,12 @@ FinalGlideThroughTerrain(const double this_bearing,
 
   double Xrounding = fabs(loc.Longitude-start_loc.Longitude)/2;
   double Yrounding = fabs(loc.Latitude-start_loc.Latitude)/2;
-  terrain.SetTerrainRounding(Xrounding, Yrounding);
+  RasterRounding rounding(*terrain.GetMap(),Xrounding,Yrounding);
 
   loc = last_loc = start_loc;
 
   altitude = Calculated->NavAltitude;
-  h =  max(0, terrain.GetTerrainHeight(loc));
+  h =  max(0, terrain.GetTerrainHeight(loc,rounding));
   dh = altitude - h - settings.SAFETYALTITUDETERRAIN;
   last_dh = dh;
   if (dh<0) {
@@ -162,7 +161,7 @@ FinalGlideThroughTerrain(const double this_bearing,
     loc.Longitude += dloc.Longitude;
 
     // find height over terrain
-    h =  max(0,terrain.GetTerrainHeight(loc));
+    h =  max(0,terrain.GetTerrainHeight(loc, rounding));
 
     dh = altitude - h - settings.SAFETYALTITUDETERRAIN;
 
@@ -318,20 +317,18 @@ EffectiveMacCready_internal(const NMEA_INFO *Basic, const DERIVED_INFO *Calculat
                             bool cruise_efficiency_mode)
 {
   if (Calculated->ValidFinish) return 0;
-  if (ActiveTaskPoint<=0) return 0; // no e mc before start
+  if (task.getActiveIndex()<=0) return 0; // no e mc before start
   if (!Calculated->ValidStart) return 0;
   if (Calculated->TaskStartTime<0) return 0;
 
 
-  if (!ValidTask()
-      || !ValidTaskPoint(ActiveTaskPoint-1)) return 0;
+  if (!task.Valid()
+      || !task.ValidTaskPoint(task.getActiveIndex()-1)) return 0;
   if (Calculated->TaskDistanceToGo<=0) {
     return 0;
   }
 
   double mc_setting = GlidePolar::GetMacCready();
-
-  mutexTaskData.Lock();
 
   double start_speed = Calculated->TaskStartSpeed;
   double V_bestld = GlidePolar::Vbestld;
@@ -346,28 +343,22 @@ EffectiveMacCready_internal(const NMEA_INFO *Basic, const DERIVED_INFO *Calculat
   double LegDistances[MAXTASKPOINTS];
   double LegBearings[MAXTASKPOINTS];
 
-  for (int i=0; i<ActiveTaskPoint; i++) {
-    GEOPOINT w1 = way_points.get(task_points[i+1].Index).Location;
-    GEOPOINT w0 = way_points.get(task_points[i].Index).Location;
-    if (AATEnabled) {
-      if (ValidTaskPoint(i+1)) {
-        w1 = task_stats[i+1].AATTargetLocation;
-      }
-      if (i>0) {
-        w0 = task_stats[i].AATTargetLocation;
-      }
-    }
+  // JMW TODO remove dist/bearing: this is already done inside the task!
+
+  for (unsigned i=0; i<task.getActiveIndex(); i++) {
+    GEOPOINT w1 = task.getTargetLocation(i+1);
+    GEOPOINT w0 = task.getTargetLocation(i);
     DistanceBearing(w0, w1,
                     &LegDistances[i], &LegBearings[i]);
 
-    if (i==ActiveTaskPoint-1) {
+    if (i+1==task.getActiveIndex()) {
       LegDistances[i] = ProjectedDistance(w0, w1, Basic->Location);
     }
-    if ((StartLine==0) && (i==0)) {
+    if ((task.getSettings().StartType==START_CIRCLE) && (i==0)) {
       // Correct speed calculations for radius
       // JMW TODO accuracy: leg distance replace this with more accurate version
       // leg_distance -= StartRadius;
-      LegDistances[0] = max(0.1,LegDistances[0]-StartRadius);
+      LegDistances[0] = max(0.1,LegDistances[0]-task.getSettings().StartRadius);
     }
   }
 
@@ -404,7 +395,7 @@ EffectiveMacCready_internal(const NMEA_INFO *Basic, const DERIVED_INFO *Calculat
     // allowing for final glide where possible if aircraft height is below
     // start
 
-    for(int i=ActiveTaskPoint-1;i>=0; i--) {
+    for(int i=task.getActiveIndex()-1;i>=0; i--) {
 
       double time_this;
 
@@ -456,8 +447,6 @@ EffectiveMacCready_internal(const NMEA_INFO *Basic, const DERIVED_INFO *Calculat
     }
 
   }
-
-  mutexTaskData.Unlock();
 
   return value_found;
 }

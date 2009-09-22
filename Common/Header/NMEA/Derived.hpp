@@ -38,10 +38,7 @@ Copyright_License {
 #ifndef XCSOAR_NMEA_DERIVED_H
 #define XCSOAR_NMEA_DERIVED_H
 
-#define WIN32_LEAN_AND_MEAN		// Exclude rarely-used stuff from Windows headers
-#include <windows.h>
 #include "Screen/shapelib/mapshape.h"
-
 #include "GeoPoint.hpp"
 
 #define NUMTHERMALBUCKETS 10
@@ -54,6 +51,14 @@ struct THERMAL_SOURCE_INFO
   double LiftRate;
   double Time;
 };
+
+typedef enum {
+  CRUISE= 0,
+  WAITCLIMB,
+  CLIMB,
+  WAITCRUISE
+} CirclingMode_t;
+
 
 struct DERIVED_INFO
 {
@@ -160,7 +165,7 @@ struct DERIVED_INFO
   GEOPOINT TurnStartLocation;
   double TurnStartAltitude;
   double TurnStartEnergyHeight;
-  int TurnMode;
+  CirclingMode_t TurnMode;
 
   // reflects whether aircraft is in a start/finish/aat/turn sector
   bool IsInSector;
@@ -169,7 +174,7 @@ struct DERIVED_INFO
   bool InStartSector;
   int StartSectorWaypoint;
 
-  int ActiveTaskPoint; 
+  unsigned ActiveTaskPoint; 
   int ReadyWayPoint;
 
   // detects when glider is on ground for several seconds

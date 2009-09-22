@@ -1,4 +1,3 @@
-
 /*
 Copyright_License {
 
@@ -36,9 +35,7 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Dialogs.h"
-#include "Dialogs/dlgTools.h"
+#include "Dialogs/Internal.hpp"
 #include "MainWindow.hpp"
 #include "Compatibility/string.h"
 #include "SettingsUser.hpp"
@@ -66,9 +63,6 @@ static void OnCloseClicked(WindowControl * Sender){
 static void
 OnTextPaint(WindowControl *Sender, Canvas &canvas)
 {
-  RECT  rcgfx;
-
-  CopyRect(&rcgfx, Sender->GetBoundRect());
   // background is painted in the base-class
   canvas.select(*Sender->GetFont());
   canvas.background_transparent();

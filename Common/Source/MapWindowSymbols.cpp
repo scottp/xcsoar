@@ -38,7 +38,6 @@ Copyright_License {
 #include "XCSoar.h"
 #include "Protection.hpp"
 #include "InfoBoxLayout.h"
-#include "Screen/Util.hpp"
 #include "Screen/Fonts.hpp"
 #include "Screen/Graphics.hpp"
 #include "Math/Screen.hpp"
@@ -47,7 +46,6 @@ Copyright_License {
 #include "Logger.h"
 #include "Language.hpp"
 #include "McReady.h"
-#include "Settings.hpp"
 #include "SettingsTask.hpp"
 #include "SettingsUser.hpp"
 #include "SettingsComputer.hpp"
@@ -233,17 +231,17 @@ void MapWindow::DrawFlightMode(Canvas &canvas, const RECT rc)
       flip = !flip;
 
       // don't bother drawing logger if not active for more than one second
-      if ((!isLoggerActive())&&(!lastLoggerActive)) {
+      if ((!logger.isLoggerActive())&&(!lastLoggerActive)) {
         drawlogger = false;
       }
-      lastLoggerActive = isLoggerActive();
+      lastLoggerActive = logger.isLoggerActive();
     }
 
     if (drawlogger) {
       offset -= 7;
 
       draw_masked_bitmap(canvas, 
-			 (isLoggerActive() && flip)
+			 (logger.isLoggerActive() && flip)
 			 ? MapGfx.hLogger : MapGfx.hLoggerOff,
 			 rc.right + IBLSCALE(offset + Appearance.FlightModeOffset.x),
 			 rc.bottom + IBLSCALE(-7 + Appearance.FlightModeOffset.y),
@@ -253,7 +251,7 @@ void MapWindow::DrawFlightMode(Canvas &canvas, const RECT rc)
 
   if (Appearance.FlightModeIcon == apFlightModeIconDefault){
     Bitmap *bmp;
-    if (isTaskAborted()) {
+    if (task.isTaskAborted()) {
       bmp = &MapGfx.hAbort;
     } else if (DisplayMode == dmCircling) {
       bmp = &MapGfx.hClimb;
@@ -317,7 +315,7 @@ void MapWindow::DrawFlightMode(Canvas &canvas, const RECT rc)
 
     }
 
-    if (isTaskAborted())
+    if (task.isTaskAborted())
       canvas.select(MapGfx.hBrushFlyingModeAbort);
     else
       canvas.select(MapGfx.hbCompass);
@@ -511,9 +509,7 @@ void MapWindow::DrawFinalGlide(Canvas &canvas, const RECT rc)
   int Offset0;
   int i;
   
-  ScopeLock protect(mutexTaskData);
-  if (ValidTask()){
-    // if (ActiveTaskPoint >= 0) {
+  if (task.Valid()){
     
     const int y0 = ( (rc.bottom - rc.top )/2)+rc.top;
     
@@ -682,7 +678,8 @@ void MapWindow::DrawFinalGlide(Canvas &canvas, const RECT rc)
                     IBLSCALE(1),
                     Value);
         
-        if (Units::GetUnitBitmap(Units::GetUserAltitudeUnit(), &Bmp, &BmpPos, &BmpSize, 0)){
+        if (Units::GetUnitBitmap(Units::GetUserAltitudeUnit(), 
+                                 &Bmp, &BmpPos, &BmpSize, 0)){
           draw_bitmap(canvas, *Bmp, 
                       x + TextSize.cx + IBLSCALE(1), y,
                       BmpPos.x, BmpPos.y, 
@@ -713,8 +710,8 @@ void MapWindow::DrawCompass(Canvas &canvas, const RECT rc)
     // North arrow
     PolygonRotateShift(Arrow, 5, Start.x, Start.y, -DisplayAngle);
     canvas.polygon(Arrow, 5);
-  } else
-  if (Appearance.CompassAppearance == apCompassAltA){
+
+  } else if (Appearance.CompassAppearance == apCompassAltA) {
 
     static double lastDisplayAngle = 9999.9;
     static int lastRcRight = 0;
@@ -760,10 +757,7 @@ void MapWindow::DrawCompass(Canvas &canvas, const RECT rc)
 
 void MapWindow::DrawBestCruiseTrack(Canvas &canvas)
 {
-  if (ActiveTaskPoint<0) {
-    return; // nothing to draw..
-  }
-  if (!ValidTask()) {
+  if (!task.Valid()) {
     return;
   }
 
@@ -791,7 +785,8 @@ void MapWindow::DrawBestCruiseTrack(Canvas &canvas)
   } else
   if (Appearance.BestCruiseTrack == ctBestCruiseTrackAltA){
 
-    POINT Arrow[] = { {-1,-40}, {-1,-62}, {-6,-62}, {0,-70}, {6,-62}, {1,-62}, {1,-40}, {-1,-40}};
+    POINT Arrow[] = { {-1,-40}, {-1,-62}, {-6,-62}, {0,-70}, 
+                      {6,-62}, {1,-62}, {1,-40}, {-1,-40}};
 
     PolygonRotateShift(Arrow, sizeof(Arrow)/sizeof(Arrow[0]),
                        Orig_Aircraft.x, Orig_Aircraft.y,

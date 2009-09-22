@@ -1,63 +1,101 @@
+/*
+Copyright_License {
+
+  XCSoar Glide Computer - http://www.xcsoar.org/
+  Copyright (C) 2000 - 2009
+
+	M Roberts (original release)
+	Robin Birch <robinb@ruffnready.co.uk>
+	Samuel Gisiger <samuel.gisiger@triadis.ch>
+	Jeff Goodenough <jeff@enborne.f2s.com>
+	Alastair Harrison <aharrison@magic.force9.co.uk>
+	Scott Penrose <scottp@dd.com.au>
+	John Wharington <jwharington@gmail.com>
+	Lars H <lars_hn@hotmail.com>
+	Rob Dunning <rob@raspberryridgesheepfarm.com>
+	Russell King <rmk@arm.linux.org.uk>
+	Paolo Ventafridda <coolwind@email.it>
+	Tobias Lohner <tobias@lohner-net.de>
+	Mirek Jezek <mjezek@ipplc.cz>
+	Max Kellermann <max@duempel.org>
+
+  This program is free software; you can redistribute it and/or
+  modify it under the terms of the GNU General Public License
+  as published by the Free Software Foundation; either version 2
+  of the License, or (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+}
+*/
 
 #include "TaskVisitor.hpp"
 #include <stdio.h>
 #include "SettingsTask.hpp"
 #include "SettingsComputer.hpp"
-#include "Protection.hpp"
 #include <math.h>
 #include "Math/FastMath.h"
 #include "Units.hpp"
 #include "Components.hpp"
 #include "WayPointList.hpp"
 
-void TaskScan::scan_point_forward(RelativeTaskPointVisitor &visitor)
-{
-  ScopeLock protect(mutexTaskData);
 
+// note: if this calls any task member functions they will be locked
+// recursively
+
+
+void Task::scan_point_forward(RelativeTaskPointVisitor &visitor)
+{
+  visitor.setTask(*this);
   visitor.visit_reset();
-  if (EnableMultipleStartPoints) {
-    for (int j=0; j<MAXSTARTPOINTS; j++) {
+  if (settings.EnableMultipleStartPoints) {
+    for (unsigned j=0; j<MAXSTARTPOINTS; j++) {
       if ((task_start_points[j].Index != -1) && task_start_stats[j].Active)
 	visitor.visit_start_point(task_start_points[j], j);
     }
   }
-  if ((ActiveTaskPoint<0)||(task_points[0].Index<0)) {
+  if (!ValidTaskPoint(0)) {
     visitor.visit_null();
     return;
   }
 
-  int i=0;
+  unsigned i=0;
   while (i<ActiveTaskPoint) {
     visitor.visit_task_point_before(task_points[i], i);
     i++;
   } 
   visitor.visit_task_point_current(task_points[i], i);
   i++;
-  while ((i<MAXTASKPOINTS) && (task_points[i].Index != -1)) {
+  while (ValidTaskPoint(i)) {
     visitor.visit_task_point_after(task_points[i], i);
     i++;
   }
 }
 
 
-void TaskScan::scan_point_forward(AbsoluteTaskPointVisitor &visitor)
+void Task::scan_point_forward(AbsoluteTaskPointVisitor &visitor)
 {
-  ScopeLock protect(mutexTaskData);
-
+  visitor.setTask(*this);
   visitor.visit_reset();
 
-  if (EnableMultipleStartPoints) {
-    for (int j=0; j<MAXSTARTPOINTS; j++) {
+  if (settings.EnableMultipleStartPoints) {
+    for (unsigned j=0; j<MAXSTARTPOINTS; j++) {
       if ((task_start_points[j].Index != -1) && task_start_stats[j].Active)
 	visitor.visit_start_point(task_start_points[j], j);
     }
   }
 
-  if (task_points[0].Index<0) {
+  if (!Valid()) {
     visitor.visit_null();
     return;
   }
-  int i=0;
+  unsigned i=0;
   while ((i+1<MAXTASKPOINTS) && (task_points[i+1].Index != -1)) {
     if (i==0) {
       visitor.visit_task_point_start(task_points[0], 0);
@@ -70,32 +108,33 @@ void TaskScan::scan_point_forward(AbsoluteTaskPointVisitor &visitor)
 }
 
 
-void TaskScan::scan_leg_forward(RelativeTaskLegVisitor &visitor)
+void Task::scan_leg_forward(RelativeTaskLegVisitor &visitor)
 {
-  ScopeLock protect(mutexTaskData);
-
+  visitor.setTask(*this);
   visitor.visit_reset();
 
-  if ((ActiveTaskPoint<0)||(task_points[0].Index<0)) {
+  if (!Valid()) {
     visitor.visit_null();
     return;
   }
-  if (task_points[1].Index<0) {
+  if (!ValidTaskPoint(1)) {
     visitor.visit_single(task_points[0], 0);
     return;
   }
-  int i=0;
-  while ((i+1<MAXTASKPOINTS) && (task_points[i+1].Index != -1)) {
-    if (i+1<ActiveTaskPoint) {
-      visitor.visit_leg_before(task_points[i], i,
-				task_points[i+1], i+1);
-    } else if (i+1==ActiveTaskPoint) {
-      visitor.visit_leg_current(task_points[i], i,
-				 task_points[i+1], i+1);
-    } else {
-      visitor.visit_leg_after(task_points[i], i,
-			       task_points[i+1], i+1);
-    }
+  unsigned i=0;
+  while (i+1<ActiveTaskPoint) {
+    visitor.visit_leg_before(task_points[i], i,
+                             task_points[i+1], i+1);
+    i++;
+  }
+  if (i+1==ActiveTaskPoint) {
+    visitor.visit_leg_current(task_points[i], i,
+                              task_points[i+1], i+1);
+    i++;
+  }
+  while (ValidTaskPoint(i+1)) {
+    visitor.visit_leg_after(task_points[i], i,
+                            task_points[i+1], i+1);
     i++;
   }
 }
@@ -103,28 +142,27 @@ void TaskScan::scan_leg_forward(RelativeTaskLegVisitor &visitor)
 
 
 
-void TaskScan::scan_leg_forward(AbsoluteTaskLegVisitor &visitor)
+void Task::scan_leg_forward(AbsoluteTaskLegVisitor &visitor)
 {
-  ScopeLock protect(mutexTaskData);
-
+  visitor.setTask(*this);
   visitor.visit_reset();
 
-  if (task_points[0].Index<0) {
+  if (!Valid()) {
     visitor.visit_null();
     return;
   }
-  if (EnableMultipleStartPoints) {
-    for (int j=0; j<MAXSTARTPOINTS; j++) {
+  if (settings.EnableMultipleStartPoints) {
+    for (unsigned j=0; j<MAXSTARTPOINTS; j++) {
       if ((task_start_points[j].Index != -1) && task_start_stats[j].Active)
 	visitor.visit_leg_multistart(task_start_points[j], j, task_points[0]);
     }
   }
-  if (task_points[1].Index<0) {
+  if (!ValidTaskPoint(1)) {
     visitor.visit_single(task_points[0], 0);
     return;
   }
-  int i=0;
-  while ((i+2<MAXTASKPOINTS) && (task_points[i+2].Index != -1)) {
+  unsigned i=0;
+  while (ValidTaskPoint(i+2)) {
     visitor.visit_leg_intermediate(task_points[i], i,
 				   task_points[i+1], i+1);
     i++;
@@ -134,39 +172,76 @@ void TaskScan::scan_leg_forward(AbsoluteTaskLegVisitor &visitor)
 }
 
 
-void TaskScan::scan_leg_reverse(AbsoluteTaskLegVisitor &visitor)
+void Task::scan_leg_reverse(AbsoluteTaskLegVisitor &visitor)
 {
-  ScopeLock protect(mutexTaskData);
-
+  visitor.setTask(*this);
   visitor.visit_reset();
 
-  if (task_points[0].Index<0) {
+  if (!Valid()) {
     visitor.visit_null();
     return;
   }
-  if (task_points[1].Index<0) {
+  unsigned final = getFinalWaypoint();
+  if (final==0) {
     visitor.visit_single(task_points[0], 0);
     return;
   }
-  int final = getFinalWaypoint();
   int i= final-1;
   while (i>=0) {
-    if (i==final-1) {
+    if (i+1==(int)final) {
       visitor.visit_leg_final(task_points[i], i,
-			      task_points[i+1], i+1);
+                              task_points[i+1], i+1);
     } else {
       visitor.visit_leg_intermediate(task_points[i], i,
-				     task_points[i+1], i+1);
+                                     task_points[i+1], i+1);
     }
     i--;
   }
 
-  if (EnableMultipleStartPoints) {
-    for (int j=0; j<MAXSTARTPOINTS; j++) {
+  if (settings.EnableMultipleStartPoints) {
+    for (unsigned j=0; j<MAXSTARTPOINTS; j++) {
       if ((task_start_points[j].Index != -1) && task_start_stats[j].Active)
 	visitor.visit_leg_multistart(task_start_points[j], j, task_points[0]);
     }
   }
+}
+
+
+void Task::scan_leg_reverse(RelativeTaskLegVisitor &visitor)
+{
+  visitor.setTask(*this);
+  visitor.visit_reset();
+
+  if (!Valid()) {
+    visitor.visit_null();
+    return;
+  }
+  if (!ValidTaskPoint(1)) {
+    visitor.visit_single(task_points[0], 0);
+    return;
+  }
+
+  unsigned final = getFinalWaypoint();
+  if (final==0) {
+    visitor.visit_single(task_points[0], 0);
+    return;
+  }
+  unsigned a= ActiveTaskPoint;
+  unsigned i= final;
+  while (i>0) {
+    if (i<a) {
+      visitor.visit_leg_before(task_points[i-1], i-1,
+                               task_points[i], i);
+    } else if (i==a) {
+      visitor.visit_leg_current(task_points[i-1], i-1,
+                                task_points[i], i);
+    } else {
+      visitor.visit_leg_after(task_points[i-1], i-1,
+                              task_points[i], i);
+    }
+    i--;
+  }
+
 }
 
 
@@ -259,25 +334,25 @@ class TaskSectorsVisitor:
   public AbsoluteTaskPointVisitor {
 public:
   void visit_task_point_start(TASK_POINT &point, const unsigned index) { 
-    if (StartLine==2) {
+    if (_task->getSettings().StartType== START_SECTOR) {
       SectorAngle = 45+90;
     } else {
       SectorAngle = 90;
     }
-    SectorSize = StartRadius;
+    SectorSize = _task->getSettings().StartRadius;
     SectorBearing = point.OutBound;
     setStartEnd(point);
     clearAAT(point, index);
   };
   void visit_task_point_intermediate(TASK_POINT &point, const unsigned index) { 
     SectorAngle = 45;
-    if (SectorType == 2) {
+    if (_task->getSettings().SectorType == 2) {
       SectorSize = 10000; // German DAe 0.5/10
     } else {
-      SectorSize = SectorRadius;  // FAI sector
+      SectorSize = _task->getSettings().SectorRadius;  // FAI sector
     }
     SectorBearing = point.Bisector;    
-    if (!AATEnabled) {
+    if (!_task->getSettings().AATEnabled) {
       point.AATStartRadial  = AngleLimit360(SectorBearing - SectorAngle);
       point.AATFinishRadial = AngleLimit360(SectorBearing + SectorAngle);
     }
@@ -285,12 +360,12 @@ public:
   };
   void visit_task_point_final(TASK_POINT &point, const unsigned index) { 
     // finish line
-    if (FinishLine==2) {
+    if (_task->getSettings().FinishType==FINISH_SECTOR) {
       SectorAngle = 45;
     } else {
       SectorAngle = 90;
     }
-    SectorSize = FinishRadius;
+    SectorSize = _task->getSettings().FinishRadius;
     SectorBearing = point.InBound;
     setStartEnd(point);
 
@@ -310,10 +385,10 @@ private:
 			  SectorBearing - SectorAngle, SectorSize,
 			  &pt.SectorEnd);
   }
-  void clearAAT(const TASK_POINT &point, const unsigned i) {
-    task_stats[i].AATTargetOffsetRadius = 0.0;
-    task_stats[i].AATTargetOffsetRadial = 0.0;
-    task_stats[i].AATTargetLocation = way_points.get(point.Index).Location;
+  void clearAAT(TASK_POINT &point, const unsigned i) {
+    point.AATTargetOffsetRadius = 0.0;
+    point.AATTargetOffsetRadial = 0.0;
+    point.AATTargetLocation = way_points.get(point.Index).Location;
   };
 };
 
@@ -327,32 +402,30 @@ public:
   {
   }
   void visit_reset() {
-    if (true) {
-      for (unsigned i = 0; way_points.verify_index(i); i++)
-        way_points.set_calc(i).InTask =
-          (way_points.get(i).Flags & HOME) == HOME;
-
-      if (ValidWayPoint(settings_computer->HomeWaypoint)) {
-        way_points.set_calc(settings_computer->HomeWaypoint).InTask = true;
-      }
+    for (unsigned i = 0; way_points.verify_index(i); i++)
+      way_points.set_calc(i).InTask =
+        (way_points.get(i).Flags & HOME) == HOME;
+    
+    if (way_points.verify_index(settings_computer->HomeWaypoint)) {
+      way_points.set_calc(settings_computer->HomeWaypoint).InTask = true;
     }
   }
   void visit_start_point(START_POINT &point, const unsigned i) { 
     way_points.set_calc(task_start_points[i].Index).InTask = true;
   }
   void visit_task_point_start(TASK_POINT &point, const unsigned i) { 
-    addTaskPoint(i);
+    addTaskPoint(point.Index);
   }
   void visit_task_point_intermediate(TASK_POINT &point, const unsigned i) { 
-    addTaskPoint(i);
+    addTaskPoint(point.Index);
   }
   void visit_task_point_final(TASK_POINT &point, const unsigned i) { 
-    addTaskPoint(i);
+    addTaskPoint(point.Index);
   }
 private:
   const SETTINGS_COMPUTER *settings_computer;
   void addTaskPoint(const unsigned i) {
-    way_points.set_calc(task_points[i].Index).InTask = true;
+    way_points.set_calc(i).InTask = true;
   }
 };
 
@@ -382,9 +455,9 @@ public:
 		    way_points.get(point1.Index).Location,
 		    &point1.LegDistance, &point1.InBound);
 
-    if (AATEnabled) {
-      DistanceBearing(task_stats[index0].AATTargetLocation,
-		      task_stats[index1].AATTargetLocation,
+    if (_task->getSettings().AATEnabled) {
+      DistanceBearing(point0.AATTargetLocation,
+		      point1.AATTargetLocation,
 		      &point1.LegDistance, &point1.LegBearing);
     } else {
       point1.LegBearing = point1.InBound;
@@ -413,15 +486,15 @@ public:
     total_length = geom.total_length;
   }
   void visit_single(TASK_POINT &point0, const unsigned index0) {
-    task_stats[index0].LengthPercent=1.0;
+    point0.LengthPercent=1.0;
   };
   void visit_leg_intermediate(TASK_POINT &point0, const unsigned index0,
 			      TASK_POINT &point1, const unsigned index1) 
   {
     if (index0==0) {
-      task_stats[index0].LengthPercent=0;
+      point0.LengthPercent=0;
     } else {
-      task_stats[index0].LengthPercent=point0.LegDistance/total_length;
+      point0.LengthPercent=point0.LegDistance/total_length;
     }
   };
   void visit_leg_final(TASK_POINT &point0, const unsigned index0,
@@ -434,26 +507,19 @@ private:
 };
 
 
-
-
-void RefreshTask_Visitor(const SETTINGS_COMPUTER &settings_computer) 
+void Task::RefreshTask_Visitor(const SETTINGS_COMPUTER &settings_computer) 
 {
-  ScopeLock protect(mutexTaskData);
-  if ((ActiveTaskPoint<0)&&(task_points[0].Index>=0)) {
-    ActiveTaskPoint=0;
-  }
-
   TaskLegGeometryVisitor geom;
-  TaskScan::scan_leg_forward(geom);
+  scan_leg_forward(geom);
 
   TaskLegPercentVisitor legpercent(geom);
-  TaskScan::scan_leg_forward(legpercent);
+  scan_leg_forward(legpercent);
 
   TaskSectorsVisitor sectors;
-  TaskScan::scan_point_forward(sectors);
+  scan_point_forward(sectors);
 
   WaypointsInTaskVisitor waypoint_in_task(settings_computer);
-  TaskScan::scan_point_forward(waypoint_in_task);
+  scan_point_forward(waypoint_in_task);
 
 }
 
@@ -464,20 +530,20 @@ public:
   virtual void visit_task_point_current(TASK_POINT &point, const unsigned i) 
   { 
     double stepsize = 25.0;
-    if (!ValidTaskPoint(i+1)) {
+    if (!_task->ValidTaskPoint(i+1)) {
       // This must be the final waypoint, so it's not an AAT OZ
       return;
     }
-    int j;
+    unsigned j;
     for (j=0; j<MAXISOLINES; j++) {
-      task_stats[i].IsoLine_valid[j]= false;
+      point.IsoLine_valid[j]= false;
     }
-    GEOPOINT location = task_stats[i].AATTargetLocation;
+    GEOPOINT location = point.AATTargetLocation;
     double dist_0, dist_north, dist_east;
     bool in_sector = true;
     
     double max_distance, delta;
-    if(point.AATType == SECTOR) {
+    if(point.AATType == AAT_SECTOR) {
       max_distance = point.AATSectorRadius;
     } else {
       max_distance = point.AATCircleRadius;
@@ -495,26 +561,27 @@ public:
     // fill
     j=0;
     // insert start point
-    task_stats[i].IsoLine_Location[j]= location;
-    task_stats[i].IsoLine_valid[j]= true;
+    point.IsoLine_Location[j]= location;
+    point.IsoLine_valid[j]= true;
     j++;
     
     do {
-      dist_0 = DoubleLegDistance(i, location);
+      dist_0 = _task->DoubleLegDistance(i, location);
       
       GEOPOINT loc_north;
       FindLatitudeLongitude(location,
 			    0, stepsize,
 			    &loc_north);
-      dist_north = DoubleLegDistance(i, loc_north);
+      dist_north = _task->DoubleLegDistance(i, loc_north);
       
       GEOPOINT loc_east;
       FindLatitudeLongitude(location,
 			    90, stepsize,
 			    &loc_east);
-      dist_east = DoubleLegDistance(i, loc_east);
+      dist_east = _task->DoubleLegDistance(i, loc_east);
       
-      double angle = AngleLimit360(RAD_TO_DEG*atan2(dist_east-dist_0, dist_north-dist_0)+90);
+      double angle = AngleLimit360(RAD_TO_DEG*atan2(dist_east-dist_0, 
+                                                    dist_north-dist_0)+90);
       if (left) {
 	angle += 180;
       }
@@ -523,26 +590,26 @@ public:
 			    angle, delta,
 			    &location);
       
-      in_sector = InAATTurnSector(location, i);
+      in_sector = _task->InAATTurnSector(location, i);
       /*
         if (dist_0 < distance_glider) {
 	in_sector = false;
         }
       */
       if (in_sector) {
-	task_stats[i].IsoLine_Location[j] = location;
-	task_stats[i].IsoLine_valid[j] = true;
+	point.IsoLine_Location[j] = location;
+	point.IsoLine_valid[j] = true;
 	j++;
       } else {
 	j++;
 	if (!left && (j<MAXISOLINES-2))  {
 	  left = true;
-	  location = task_stats[i].AATTargetLocation;
+	  location = point.AATTargetLocation;
 	  in_sector = true; // cheat to prevent early exit
 	  
 	  // insert start point (again)
-	  task_stats[i].IsoLine_Location[j] = location;
-	  task_stats[i].IsoLine_valid[j] = true;
+	  point.IsoLine_Location[j] = location;
+	  point.IsoLine_valid[j] = true;
 	  j++;
 	}
       }
@@ -555,9 +622,9 @@ public:
 
 
 
-void CalculateAATIsoLines(void) {
-  if(AATEnabled) {
+void Task::CalculateAATIsoLines(void) {
+  if (settings.AATEnabled) {
     AATIsoLineVisitor av;
-    TaskScan::scan_point_forward(av);
+    scan_point_forward(av);
   }  
 }

@@ -35,10 +35,8 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include "Dialogs.h"
-#include "Language.hpp"
 #include "Math/Earth.hpp"
 #include "Registry.hpp"
 #include "LocalPath.hpp"
@@ -46,11 +44,9 @@ Copyright_License {
 #include "UtilsText.hpp"
 #include "Math/SunEphemeris.hpp"
 #include "Blackboard.hpp"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
 #include "McReady.h"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
 #include "Math/FastMath.h"
 #include "MainWindow.hpp"
@@ -75,6 +71,7 @@ static WndFrame *wSpecial=NULL; // VENTA3
 static WndOwnerDrawFrame *wImage=NULL;
 static BOOL hasimage1 = false;
 static BOOL hasimage2 = false;
+static int SelectedWaypoint = -1;
 
 #ifndef CECORE
 #ifndef GNAV
@@ -231,64 +228,52 @@ static int FormKeyDown(WindowControl * Sender, WPARAM wParam, LPARAM lParam){
 
 
 static void OnGotoClicked(WindowControl * Sender){
-	(void)Sender;
-  mutexTaskData.Lock();
-  FlyDirectTo(SelectedWaypoint,XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  (void)Sender;
+  task.FlyDirectTo(SelectedWaypoint,XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 static void OnReplaceClicked(WindowControl * Sender){
-	(void)Sender;
-  mutexTaskData.Lock();
-  ReplaceWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  (void)Sender;
+  task.ReplaceWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 static void OnNewHomeClicked(WindowControl * Sender){
 	(void)Sender;
-  mutexTaskData.Lock();
   XCSoarInterface::SetSettingsComputer().HomeWaypoint = SelectedWaypoint;
   SetToRegistry(szRegistryHomeWaypoint, XCSoarInterface::SettingsComputer().HomeWaypoint);
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 // VENTA3
 static void OnSetAlternate1Clicked(WindowControl * Sender){
 	(void)Sender;
-  mutexTaskData.Lock();
   XCSoarInterface::SetSettingsComputer().Alternate1 = SelectedWaypoint;
   SetToRegistry(szRegistryAlternate1, XCSoarInterface::SettingsComputer().Alternate1);
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 static void OnSetAlternate2Clicked(WindowControl * Sender){
 	(void)Sender;
-  mutexTaskData.Lock();
   XCSoarInterface::SetSettingsComputer().Alternate2 = SelectedWaypoint;
   SetToRegistry(szRegistryAlternate2, XCSoarInterface::SettingsComputer().Alternate2);
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 static void OnClearAlternatesClicked(WindowControl * Sender){
 	(void)Sender;
-  mutexTaskData.Lock();
   XCSoarInterface::SetSettingsComputer().Alternate1 = -1; 
   XCSoarInterface::SetSettingsComputer().EnableAlternate1=false;
   XCSoarInterface::SetSettingsComputer().Alternate2 = -1; 
   XCSoarInterface::SetSettingsComputer().EnableAlternate2=false;
   SetToRegistry(szRegistryAlternate1, XCSoarInterface::SettingsComputer().Alternate1);
   SetToRegistry(szRegistryAlternate2, XCSoarInterface::SettingsComputer().Alternate2);
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
@@ -304,30 +289,22 @@ static void OnTeamCodeClicked(WindowControl * Sender){
 
 
 static void OnInsertInTaskClicked(WindowControl * Sender){
-	(void)Sender;
-  mutexTaskData.Lock();
-  InsertWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  (void)Sender;
+  task.InsertWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
 static void OnAppendInTaskClicked(WindowControl * Sender){
-	(void)Sender;
-  mutexTaskData.Lock();
-  InsertWaypoint(SelectedWaypoint, XCSoarInterface::SettingsComputer(), true);
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  (void)Sender;
+  task.InsertWaypoint(SelectedWaypoint, XCSoarInterface::SettingsComputer(), true);
   wf->SetModalResult(mrOK);
 }
 
 
 static void OnRemoveFromTaskClicked(WindowControl * Sender){
-	(void)Sender;
-  mutexTaskData.Lock();
-  RemoveWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
-  RefreshTask(XCSoarInterface::SettingsComputer());
-  mutexTaskData.Unlock();
+  (void)Sender;
+  task.RemoveWaypoint(SelectedWaypoint,XCSoarInterface::SettingsComputer());
   wf->SetModalResult(mrOK);
 }
 
@@ -382,6 +359,8 @@ void dlgWayPointDetailsShowModal(void){
   nTextLines = 0;
 
   if (!wf) return;
+
+  SelectedWaypoint = task.getSelected();
 
   GetRegistryString(szRegistryWayPointFile, szWaypointFile, MAX_PATH);
   ExpandLocalPath(szWaypointFile);

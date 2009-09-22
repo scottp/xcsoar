@@ -35,22 +35,18 @@ Copyright_License {
 }
 */
 
-
-#include "XCSoar.h"
-#include "Dialogs.h"
+#include "Dialogs/Internal.hpp"
 #include "Blackboard.hpp"
-#include "Dialogs/dlgTools.h"
-#include "Language.hpp"
 #include "InfoBoxLayout.h"
 #include "Airspace.h"
 #include "AirspaceWarning.h"
 #include "Compatibility/string.h"
 #include "Math/FastMath.h"
 #include "Math/Earth.hpp"
-#include "Screen/Util.hpp"
 #include "MainWindow.hpp"
 #include "DataField/Base.hpp"
 #include "MapWindow.h"
+
 #include <assert.h>
 #include <stdlib.h>
 
@@ -135,26 +131,37 @@ static void OnAirspaceListEnter(WindowControl * Sender,
           Name = AirspaceArea[index_area].Name;
         }
         if (Name) {
-          MapWindow &map_window = XCSoarInterface::main_window.map;
 	  UINT answer;
           answer = MessageBoxX(Name,
 			       gettext(TEXT("Acknowledge for day?")),
 			       MB_YESNOCANCEL|MB_ICONQUESTION);
 	  if (answer == IDYES) {
 	    if (index_circle>=0) {
-              AirspaceWarnListAdd(&XCSoarInterface::Basic(), &XCSoarInterface::Calculated(), map_window,
+              AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
+                                  &XCSoarInterface::Calculated(), 
+                                  &XCSoarInterface::SettingsComputer(),
+                                  XCSoarInterface::MapProjection(),
                                   false, true, index_circle, true);
             } else if (index_area>=0) {
-              AirspaceWarnListAdd(&XCSoarInterface::Basic(), &XCSoarInterface::Calculated(), map_window,
+              AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
+                                  &XCSoarInterface::Calculated(), 
+                                  &XCSoarInterface::SettingsComputer(),
+                                  XCSoarInterface::MapProjection(),
                                   false, false, index_area, true);
             }
           } else if (answer == IDNO) {
 	    // this will cancel a daily ack
 	    if (index_circle>=0) {
-              AirspaceWarnListAdd(&XCSoarInterface::Basic(), &XCSoarInterface::Calculated(), map_window,
+              AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
+                                  &XCSoarInterface::Calculated(), 
+                                  &XCSoarInterface::SettingsComputer(),
+                                  XCSoarInterface::MapProjection(),
                                   true, true, index_circle, true);
             } else if (index_area>=0) {
-              AirspaceWarnListAdd(&XCSoarInterface::Basic(), &XCSoarInterface::Calculated(), map_window,
+              AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
+                                  &XCSoarInterface::Calculated(), 
+                                  &XCSoarInterface::SettingsComputer(),
+                                  XCSoarInterface::MapProjection(),
                                   true, false, index_area, true);
             }
 	  }

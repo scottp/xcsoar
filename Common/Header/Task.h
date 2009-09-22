@@ -38,140 +38,114 @@ Copyright_License {
 #if !defined(XCSOAR_TASK_H)
 #define XCSOAR_TASK_H
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include "Sizes.h"
-
-#include "GeoPoint.hpp"
-#include "SettingsComputer.hpp"
-
-#define CIRCLE 0
-#define SECTOR 1
-
-typedef struct _START_POINT
-{
-  int Index;
-  double OutBound;
-  GEOPOINT SectorStart;
-  GEOPOINT SectorEnd;
-} START_POINT;
-
-typedef struct _START_POINT_STATS
-{
-  bool Active;
-  bool InSector;
-} START_POINT_STATS;
-
-typedef struct _START_POINT_SCREEN
-{
-  POINT	 SectorStart;
-  POINT	 SectorEnd;
-} START_POINT_SCREEN;
+#include "TaskImpl.hpp"
+#include "Poco/RWLock.h"
 
 
-typedef struct _TASK_POINT
-{
-  int Index;
-  double InBound;
-  double OutBound;
-  double Bisector;
-  double LegDistance;
-  double LegBearing;
-  GEOPOINT SectorStart;
-  GEOPOINT SectorEnd;
-  int	 AATType;
-  double AATCircleRadius;
-  double AATSectorRadius;
-  double AATStartRadial;
-  double AATFinishRadial;
-  GEOPOINT AATStart;
-  GEOPOINT AATFinish;
-} TASK_POINT;
+class TaskSafe {
+private:
+  Task _task;
+  Poco::RWLock lock;
+public:
 
-typedef struct _TASK_POINT_SCREEN
-{
-  POINT	 SectorStart;
-  POINT	 SectorEnd;
-  POINT	 Target;
-  POINT	 AATStart;
-  POINT	 AATFinish;
-  POINT IsoLine_Screen[MAXISOLINES];
-} TASK_POINT_SCREEN;
+  void RefreshTask(const SETTINGS_COMPUTER &settings_computer);
+
+  void ReplaceWaypoint(const int index, 
+                               const SETTINGS_COMPUTER &settings_computer);
+  void InsertWaypoint(const int index, 
+                              const SETTINGS_COMPUTER &settings_computer,
+                              bool append=false);
+  void SwapWaypoint(const int index, 
+                            const SETTINGS_COMPUTER &settings_computer);
+  void RemoveWaypoint(const int index, 
+                              const SETTINGS_COMPUTER &settings_computer);
+  void RemoveTaskPoint(const int index, 
+                               const SETTINGS_COMPUTER &settings_computer);
+  void FlyDirectTo(const int index, 
+                           const SETTINGS_COMPUTER &settings_computer);
+
+  void advanceTaskPoint(const SETTINGS_COMPUTER &settings_computer);
+  void retreatTaskPoint(const SETTINGS_COMPUTER &settings_computer);
+
+  void ClearTask(void);
+  void RotateStartPoints(const SETTINGS_COMPUTER &settings_computer);
+  void DefaultTask(const SETTINGS_COMPUTER &settings);
+  void ResumeAbortTask(const SETTINGS_COMPUTER &settings_computer,
+                               const int set = 0);
+  void CheckStartPointInTask(void);
+  void ClearStartPoints(void);
+  void SetStartPoint(const int pointnum, const int waypointnum);
+
+  // AAT functions
+  double AdjustAATTargets(double desired);
+  const double FindInsideAATSectorRange(const GEOPOINT &location,
+                                        const int taskwaypoint,
+                                        const double course_bearing,
+                                        const double p_found);
+  const double FindInsideAATSectorDistance(const GEOPOINT &location,
+                                           const int taskwaypoint,
+                                           const double course_bearing,
+                                           const double p_found=0.0);
+  const bool isTaskModified();
+  void SetTaskModified(const bool set=true);
+  const bool isTargetModified();
+  void SetTargetModified(const bool set=true);
+  const bool InAATTurnSector(const GEOPOINT &location, 
+                             const int the_turnpoint);
+
+  // queries
+  const bool ValidTaskPoint(const unsigned i);
+  const bool Valid();
+  const double DoubleLegDistance(const int taskwaypoint, 
+                                 const GEOPOINT &location);
+  const bool TaskIsTemporary(void);
+  const int  getFinalWaypoint(void);
+  const bool ActiveIsFinalWaypoint(void);
+  const bool isTaskAborted();
+  const GEOPOINT& getTaskPointLocation(const unsigned i);
+  const GEOPOINT& getActiveLocation();
+  const GEOPOINT& getTargetLocation(const int v=-1);
+
+  // file load/save
+  void LoadNewTask(const TCHAR *FileName,
+                   const SETTINGS_COMPUTER &settings_computer);
+  void SaveTask(const TCHAR *FileName);
+  void SaveDefaultTask(void);
+  const TCHAR* getTaskFilename();
+  void ClearTaskFileName();
+  bool LoadTaskWaypoints(FILE *file);
+  const unsigned getActiveIndex();
+  void setActiveIndex(unsigned i);
+  const TASK_POINT& getTaskPoint(const int v=-1);
+  void setTaskPoint(const unsigned index, const TASK_POINT& tp);
+
+  const WAYPOINT& getWaypoint(const int v=-1);
+  const int getWaypointIndex(const int v=-1);
+
+  // advance
+  const bool isAdvanceArmed();
+  void setAdvanceArmed(const bool set);
+
+  // settings
+  const SETTINGS_TASK &getSettings();
+  void setSettings(const SETTINGS_TASK& set);
+
+  const int getSelected();
+  void setSelected(const int v=-1);
+
+  // other
+
+  void setTaskIndices(const int wpindex[MAXTASKPOINTS]);
+
+  void scan_point_forward(RelativeTaskPointVisitor &visitor, const bool write=true);
+  void scan_point_forward(AbsoluteTaskPointVisitor &visitor, const bool write=true);
+  void scan_leg_forward(RelativeTaskLegVisitor &visitor, const bool write=true);
+  void scan_leg_forward(AbsoluteTaskLegVisitor &visitor, const bool write=true);
+  void scan_leg_reverse(RelativeTaskLegVisitor &visitor, const bool write=true);
+  void scan_leg_reverse(AbsoluteTaskLegVisitor &visitor, const bool write=true);
+};
 
 
-typedef struct _TASK_POINT_STATS
-{
-  double AATTargetOffsetRadius;
-  double AATTargetOffsetRadial;
-  GEOPOINT AATTargetLocation;
-  bool   AATTargetLocked;
-  double LengthPercent;
-  GEOPOINT IsoLine_Location[MAXISOLINES];
-  bool IsoLine_valid[MAXISOLINES];
-} TASK_POINT_STATS;
-
-
-typedef TASK_POINT Task_t[MAXTASKPOINTS +1];
-typedef TASK_POINT_SCREEN TaskScreen_t[MAXTASKPOINTS +1];
-typedef TASK_POINT_STATS TaskStats_t[MAXTASKPOINTS +1];
-typedef START_POINT Start_t[MAXSTARTPOINTS +1];
-typedef START_POINT_SCREEN StartScreen_t[MAXSTARTPOINTS +1];
-typedef START_POINT_STATS StartStats_t[MAXSTARTPOINTS +1];
-
-
-//////////////
-
-void ReplaceWaypoint(int index, const SETTINGS_COMPUTER &settings_computer);
-void InsertWaypoint(int index, const SETTINGS_COMPUTER &settings_computer,
-		    bool append=false);
-void SwapWaypoint(int index, const SETTINGS_COMPUTER &settings_computer);
-void RemoveWaypoint(int index, const SETTINGS_COMPUTER &settings_computer);
-void RemoveTaskPoint(int index, const SETTINGS_COMPUTER &settings_computer);
-void FlyDirectTo(int index, const SETTINGS_COMPUTER &settings_computer);
-double AdjustAATTargets(double desired);
-void RefreshTask(const SETTINGS_COMPUTER &settings_computer);
-bool WaypointInTask(const int ind);
-
-void ClearTask(void);
-void RotateStartPoints(const SETTINGS_COMPUTER &settings_computer);
-
-bool ValidTaskPoint(const int i);
-bool ValidTask();
-bool ValidWayPoint(const int i);
-
-double FindInsideAATSectorRange(const GEOPOINT &location,
-                                const int taskwaypoint,
-                                const double course_bearing,
-                                const double p_found);
-double FindInsideAATSectorDistance(const GEOPOINT &location,
-                                const int taskwaypoint,
-                                const double course_bearing,
-                                const double p_found=0.0);
-
-double DoubleLegDistance(const int taskwaypoint, const GEOPOINT &location);
-
-void CalculateAATIsoLines(void);
-
-void DefaultTask(const SETTINGS_COMPUTER &settings);
-
-void ResumeAbortTask(const SETTINGS_COMPUTER &settings_computer,
-		     int set = 0);
-
-bool TaskIsTemporary(void);
-int  getFinalWaypoint(void);
-bool ActiveIsFinalWaypoint(void);
-bool IsFinalWaypoint(void);
-
-bool InAATTurnSector(const GEOPOINT &location, const int the_turnpoint);
-
-bool isTaskModified();
-void SetTaskModified(const bool set=true);
-bool isTargetModified();
-void SetTargetModified(const bool set=true);
-bool isTaskAborted();
-
-void CheckStartPointInTask(void);
-void ClearStartPoints(void);
-void SetStartPoint(const int pointnum, const int waypointnum);
+extern TaskSafe task;
 
 #endif

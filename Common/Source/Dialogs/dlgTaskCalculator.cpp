@@ -35,20 +35,19 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include <math.h>
 #include "Blackboard.hpp"
 #include "SettingsTask.hpp"
 #include "SettingsComputer.hpp"
 #include "McReady.h"
 #include "Units.hpp"
 #include "Calculations.h" // TODO danger! RefreshTaskStatistics()
-#include "Dialogs/dlgTools.h"
 #include "GlideSolvers.hpp"
-#include "Dialogs.h"
 #include "DataField/Base.hpp"
 #include "MainWindow.hpp"
+
+#include <math.h>
 
 static WndForm *wf=NULL;
 
@@ -83,7 +82,7 @@ static void GetCruiseEfficiency(void) {
 static void RefreshCalculator(void) {
   WndProperty* wp;
 
-  RefreshTask(XCSoarInterface::SettingsComputer());
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   RefreshTaskStatistics();
 
   // update outputs
@@ -101,17 +100,17 @@ static void RefreshCalculator(void) {
   // update outputs
   wp = (WndProperty*)wf->FindByName(TEXT("prpAATTime"));
   if (wp) {
-    if (!AATEnabled) {
+    if (!task.getSettings().AATEnabled) {
       wp->SetVisible(false);
     } else {
-      wp->GetDataField()->SetAsFloat(AATTaskLength);
+      wp->GetDataField()->SetAsFloat(task.getSettings().AATTaskLength);
     }
-      wp->RefreshDisplay();
+    wp->RefreshDisplay();
   }
 
   double d1 = (XCSoarInterface::Calculated().TaskDistanceToGo
 	       +XCSoarInterface::Calculated().TaskDistanceCovered);
-  if (AATEnabled && (d1==0.0)) {
+  if (task.getSettings().AATEnabled && (d1==0.0)) {
     d1 = XCSoarInterface::Calculated().AATTargetDistance;
   }
   wp = (WndProperty*)wf->FindByName(TEXT("prpDistance"));
@@ -137,7 +136,7 @@ static void RefreshCalculator(void) {
   wp = (WndProperty*)wf->FindByName(TEXT("prpRange"));
   if (wp) {
     wp->RefreshDisplay();
-    if (!AATEnabled || !ValidTaskPoint(ActiveTaskPoint+1)) {
+    if (!task.getSettings().AATEnabled || !task.ValidTaskPoint(task.getActiveIndex()+1)) {
       wp->SetVisible(false);
     } else {
       wp->SetVisible(true);
@@ -180,22 +179,21 @@ static void DoOptimise(void) {
   double RangeLast= Range;
   double deltaTlast = 0;
   int steps = 0;
-  if (!AATEnabled) return;
+  if (!task.getSettings().AATEnabled) return;
 
   // should do a GUI::ExchangeBlackboard() here and use local storage
 
-  mutexTaskData.Lock();
   targetManipEvent.trigger();
   do {
     myrange = Range;
-    AdjustAATTargets(Range);
-    RefreshTask(XCSoarInterface::SettingsComputer());
+    task.AdjustAATTargets(Range);
+    task.RefreshTask(XCSoarInterface::SettingsComputer());
     RefreshTaskStatistics();
     double deltaT = XCSoarInterface::Calculated().TaskTimeToGo;
     if ((XCSoarInterface::Calculated().TaskStartTime>0.0)&&(XCSoarInterface::Calculated().Flying)) {
       deltaT += XCSoarInterface::Basic().Time-XCSoarInterface::Calculated().TaskStartTime;
     }
-    deltaT= min(24.0*60.0,deltaT/60.0)-AATTaskLength-5;
+    deltaT= min(24.0*60.0,deltaT/60.0)-task.getSettings().AATTaskLength-5;
 
     double dRdT = 0.001;
     if (steps>0) {
@@ -226,12 +224,10 @@ static void DoOptimise(void) {
   } while (steps++<25);
 
   Range = myrange;
-  AdjustAATTargets(Range);
+  task.AdjustAATTargets(Range);
   RefreshCalculator();
 
   targetManipEvent.reset();
-
-  mutexTaskData.Unlock();
 }
 
 
@@ -240,7 +236,7 @@ static void OnTargetClicked(WindowControl * Sender){
   wf->SetVisible(false);
   dlgTarget();
   // find start value for range (it may have changed)
-  Range = AdjustAATTargets(2.0);
+  Range = task.AdjustAATTargets(2.0);
   RefreshCalculator();
   wf->SetVisible(true);
 }
@@ -286,7 +282,7 @@ static void OnRangeData(DataField *Sender, DataField::DataAccessKind_t Mode){
     rthis = Sender->GetAsFloat()/100.0;
     if (fabs(Range-rthis)>0.01) {
       Range = rthis;
-      AdjustAATTargets(Range);
+      task.AdjustAATTargets(Range);
       RefreshCalculator();
     }
     break;
@@ -352,14 +348,14 @@ void dlgTaskCalculatorShowModal(void){
   cruise_efficiency = CRUISE_EFFICIENCY_enter;
 
   // find start value for range
-  Range = AdjustAATTargets(2.0);
+  Range = task.AdjustAATTargets(2.0);
 
   RefreshCalculator();
 
-  if (!AATEnabled || !ValidTaskPoint(ActiveTaskPoint+1)) {
+  if (!task.getSettings().AATEnabled || !task.ValidTaskPoint(task.getActiveIndex()+1)) {
     ((WndButton *)wf->FindByName(TEXT("Optimise")))->SetVisible(false);
   }
-  if (!ValidTaskPoint(ActiveTaskPoint)) {
+  if (!task.ValidTaskPoint(task.getActiveIndex())) {
     ((WndButton *)wf->FindByName(TEXT("Target")))->SetVisible(false);
   }
 

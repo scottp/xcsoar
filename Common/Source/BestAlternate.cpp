@@ -41,15 +41,14 @@ Copyright_License {
 #include "Protection.hpp"
 #include "WayPoint.hpp"
 #include "Math/FastMath.h"
-#include "Settings.hpp"
+#include "Math/Earth.hpp"
+#include "Math/Screen.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
 #include "McReady.h"
 #include "Message.h"
 #include "GlideSolvers.hpp"
 #include "Audio/Sound.hpp"
-#include "Math/Earth.hpp"
-#include "Abort.hpp"
 #include "Components.hpp"
 #include "WayPointList.hpp"
 
@@ -97,12 +96,11 @@ GlideComputerTask::SearchBestAlternate()
   if (searchrange > ALTERNATE_MAXRANGE)
     searchrange=ALTERNATE_MAXRANGE;
 
-  mutexTaskData.Lock();
   active_bestalternate_on_entry = Calculated().BestAlternate;
 
   // Do preliminary fast search
-  int scx_aircraft, scy_aircraft;
-  LatLon2Flat(Basic().Location, &scx_aircraft, &scy_aircraft);
+  POINT sc_aircraft;
+  LatLon2Flat(Basic().Location, sc_aircraft);
 
   // Clear search lists
   for (i=0; i<MAXBEST*2; i++) {
@@ -119,7 +117,7 @@ GlideComputerTask::SearchBestAlternate()
     }
 
     int approx_distance =
-      CalculateWaypointApproxDistance(scx_aircraft, scy_aircraft, way_point);
+      CalculateWaypointApproxDistance(sc_aircraft, way_point);
 
     // Size a reasonable distance, wide enough VENTA3
     if ( approx_distance > searchrange ) continue;
@@ -263,7 +261,7 @@ GlideComputerTask::SearchBestAlternate()
     for (k=0;  k< MAXBEST; k++) {
       curwp = SortedLandableIndex[k];
 
-      if ( !ValidWayPoint(curwp) ) {
+      if ( !way_points.verify_index(curwp) ) {
 	continue;
 	// break;  // that list is unsorted !
       }
@@ -350,7 +348,7 @@ GlideComputerTask::SearchBestAlternate()
 	 * path. In any case we select the best arrival altitude place
 	 * available, even if it is "red".
 	 */
-	if ( ValidWayPoint(SortedLandableIndex[0]) ) {
+	if ( way_points.verify_index(SortedLandableIndex[0]) ) {
 	  bestalternate=SortedLandableIndex[0];
 	} else {
 	  /*
@@ -365,12 +363,12 @@ GlideComputerTask::SearchBestAlternate()
 	   */
 	  // Attempt to use the old best, but check there's one.. it
 	  // might be empty for the first run
-	  if ( ValidWayPoint(active_bestalternate_on_entry) )
+	  if ( way_points.verify_index(active_bestalternate_on_entry) )
 	    {
 	      bestalternate=active_bestalternate_on_entry;
               if (way_points.get_calc(bestalternate).AltArrival < 0) {
 		// Pick up the closest!
-		if ( ValidWayPoint( SortedApproxIndex[0]) ) {
+		if ( way_points.verify_index( SortedApproxIndex[0]) ) {
 		  bestalternate=SortedApproxIndex[0];
 		} else {
 		  /// CRITIC POINT
@@ -383,7 +381,7 @@ GlideComputerTask::SearchBestAlternate()
 		{
 		  // MapWindow2 is checking for reachables separately,
 		  // se let's see if this closest is reachable
-		  if ( ValidWayPoint( SortedApproxIndex[0] )) {
+		  if ( way_points.verify_index( SortedApproxIndex[0] )) {
                     if (way_points.get_calc(SortedApproxIndex[0]).Reachable) {
 		      bestalternate = SortedApproxIndex[0];
 		    } else
@@ -428,7 +426,7 @@ GlideComputerTask::SearchBestAlternate()
     }
   } else {
     // If still invalid, i.e. not -1, then there's a big problem
-    if ( !ValidWayPoint(bestalternate) ) {
+    if ( !way_points.verify_index(bestalternate) ) {
       AlertBestAlternate(2);
       Message::AddMessage(_T("Error, invalid best alternate!"));
       // todo: immediate disable function
@@ -441,8 +439,6 @@ GlideComputerTask::SearchBestAlternate()
          ((safecalc - way_points.get(bestalternate).Altitude) > ALTERNATE_QUIETMARGIN))
       AlertBestAlternate(1);
   }
-
-  mutexTaskData.Unlock();
 }
 
 /*
@@ -506,7 +502,7 @@ GlideComputerTask::DoBestAlternateSlow()
 void
 GlideComputerTask::DoAlternates(int AltWaypoint)
 {
-  if (!ValidWayPoint(AltWaypoint)) {
+  if (!way_points.verify_index(AltWaypoint)) {
     return;
   }
 

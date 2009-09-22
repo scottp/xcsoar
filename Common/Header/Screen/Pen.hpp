@@ -45,16 +45,36 @@ Copyright_License {
  */
 class Pen {
 public:
+#ifdef ENABLE_SDL
+  enum style {
+    SOLID,
+    DASH,
+    BLANK
+  };
+#else
   enum style {
     SOLID = PS_SOLID,
     DASH = PS_DASH,
     BLANK = PS_NULL
   };
+#endif
 
 protected:
+#ifdef ENABLE_SDL
+  unsigned width;
+  Color color;
+#else
   HPEN pen;
+#endif
 
 public:
+#ifdef ENABLE_SDL
+  Pen():width(0) {}
+  Pen(enum style style, unsigned _width, const Color _color)
+    :width(_width), color(_color) {} // XXX style
+  Pen(unsigned _width, const Color _color)
+    :width(_width), color(_color) {}
+#else /* !ENABLE_SDL */
   Pen():pen(NULL) {}
   Pen(enum style style, unsigned width, const Color c):pen(NULL) {
     set(style, width, c);
@@ -62,6 +82,8 @@ public:
   Pen(unsigned width, Color c):pen(NULL) {
     set(width, c);
   }
+#endif /* !ENABLE_SDL */
+
   ~Pen() { reset(); }
 
 public:
@@ -70,12 +92,21 @@ public:
   void reset();
 
   bool defined() const {
+#ifdef ENABLE_SDL
+    return width > 0;
+#else
     return pen != NULL;
+#endif
   }
 
+#ifdef ENABLE_SDL
+  unsigned get_width() const { return width; }
+  const Color get_color() const { return color; }
+#else
   HPEN native() const {
     return pen;
   }
+#endif
 };
 
 #endif

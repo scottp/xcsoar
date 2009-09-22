@@ -43,11 +43,9 @@ Copyright_License {
 #include "UtilsSystem.hpp"
 #include "Math/FastMath.h"
 #include "Dialogs.h"
-#include "Settings.hpp"
 #include "Audio/VarioSound.h"
 #include "InputEvents.h"
 #include "Screen/Graphics.hpp"
-#include "Screen/Util.hpp"
 #include "Screen/LabelBlock.hpp"
 #include "Compatibility/gdi.h"
 #include "TopologyStore.h"
@@ -87,6 +85,10 @@ MapWindow::MapWindow()
 {
   TargetDrag_Location.Latitude = 0;
   TargetDrag_Location.Longitude = 0;
+  zoomclimb.CruiseMapScale = 10;
+  zoomclimb.ClimbMapScale = 0.25;
+  zoomclimb.last_isclimb = false;
+  zoomclimb.last_targetpan = false;
 }
 
 MapWindow::~MapWindow()
@@ -191,8 +193,10 @@ bool MapWindow::Idle(const bool do_force) {
   static MapIdleTrigger terrain_idle;
   static MapIdleTrigger topology_idle;
   static MapIdleTrigger rasp_idle;
+  static unsigned robin = 3;
 
   if (do_force) {
+    robin = 3;
     main_idle.dirty = true;
     terrain_idle.dirty = true;
     topology_idle.dirty = true;
@@ -201,49 +205,55 @@ bool MapWindow::Idle(const bool do_force) {
   }
 
   do {
+    robin = (robin+1)%4;
+    switch(robin) {
+    case 0:
+      // scan main object visibility
+      if (main_idle.dirty) {
+        main_idle.dirty = false;
+        ScanVisibility(getSmartBounds());
 
-    // scan main object visibility
-    if (main_idle.dirty) {
-      main_idle.dirty = false;
-      ScanVisibility(getSmartBounds());
-      continue;
-    }
+        if (do_force) {
+          // exit after important object visibilities are scanned
+          // this ensures waypoints/airspace are visible after a significant
+          // shift of the map
+          return true;
+        }
 
-    if (do_force) {
-      // exit after important object visibilities are scanned
-      // this ensures waypoints/airspace are visible after a significant
-      // shift of the map
-      return true;
-    }
-    
-    if (topology_idle.dirty) {
-      if (SettingsMap().EnableTopology) {
-	topology_idle.dirty = 
-	  topology->ScanVisibility(*this, *getSmartBounds(), do_force);
-      } else {
-	topology_idle.dirty = false;
+        break;
       }
-      continue;
-    }
-
-    if (terrain_idle.dirty) {
-      terrain.ServiceTerrainCenter(Basic().Location);
-      terrain.ServiceCache();
-      
-      if (!do_force) {
-	// JMW this currently isn't working with the smart bounds
-	terrain_idle.dirty = false;
+    case 1:
+      if (topology_idle.dirty) {
+        if (SettingsMap().EnableTopology) {
+          topology_idle.dirty = 
+            topology->ScanVisibility(*this, *getSmartBounds(), do_force);
+        } else {
+          topology_idle.dirty = false;
+        }
+        break;
       }
-      continue;
-    }
-
-    if (rasp_idle.dirty) {
-      RASP.SetViewCenter(Basic().Location);
-      if (!do_force) {
-	// JMW this currently isn't working with the smart bounds
-	rasp_idle.dirty = false;
+    case 2:
+      if (terrain_idle.dirty) {
+        terrain.ServiceTerrainCenter(Basic().Location);
+        terrain.ServiceCache();
+        
+        if (!do_force) {
+          // JMW this currently isn't working with the smart bounds
+          terrain_idle.dirty = false;
+        }
+        break;
       }
-      continue;
+    case 3:
+      if (rasp_idle.dirty) {
+        RASP.SetViewCenter(Basic().Location);
+        if (!do_force) {
+          // JMW this currently isn't working with the smart bounds
+          rasp_idle.dirty = false;
+        }
+        break;
+      }
+    default:
+      break;
     }
 
   } while (RenderTimeAvailable() && 
@@ -291,7 +301,9 @@ void MapWindow::DrawThreadLoop(void) {
 bool
 MapWindow::register_class(HINSTANCE hInstance)
 {
-
+#ifdef ENABLE_SDL
+  return true;
+#else /* !ENABLE_SDL */
   WNDCLASS wc;
 
   wc.hInstance = hInstance;
@@ -312,6 +324,7 @@ MapWindow::register_class(HINSTANCE hInstance)
   wc.lpszClassName = _T("XCSoarMap");
 
   return (RegisterClass(&wc)!= FALSE);
+#endif /* !ENABLE_SDL */
 }
 
 bool MapWindow::checkLabelBlock(const RECT brect) {
@@ -337,53 +350,48 @@ void MapWindow::ScanVisibility(rectObj *bounds_active) {
 
 
 void MapWindow::SwitchZoomClimb(void) {
-
-  static double CruiseMapScale = 10;
-  static double ClimbMapScale = 0.25;
-  static bool last_isclimb = false;
-  static bool last_targetpan = false;
-
+  
   bool isclimb = (DisplayMode == dmCircling);
 
   bool my_target_pan = SettingsMap().TargetPan;
 
-  if (my_target_pan != last_targetpan) {
+  if (my_target_pan != zoomclimb.last_targetpan) {
     if (my_target_pan) {
       // save starting values
       if (isclimb) {
-        ClimbMapScale = GetMapScaleUser();
+        zoomclimb.ClimbMapScale = GetMapScaleUser();
       } else {
-        CruiseMapScale = GetMapScaleUser();
+        zoomclimb.CruiseMapScale = GetMapScaleUser();
       }
     } else {
       // restore scales
       if (isclimb) {
-        RequestMapScale(ClimbMapScale, SettingsMap());
+        RequestMapScale(zoomclimb.ClimbMapScale, SettingsMap());
       } else {
-        RequestMapScale(CruiseMapScale, SettingsMap());
+        RequestMapScale(zoomclimb.CruiseMapScale, SettingsMap());
       }
       BigZoom = true;
     }
-    last_targetpan = my_target_pan;
+    zoomclimb.last_targetpan = my_target_pan;
     return;
   }
 
   if (!my_target_pan && SettingsMap().CircleZoom) {
-    if (isclimb != last_isclimb) {
+    if (isclimb != zoomclimb.last_isclimb) {
       if (isclimb) {
         // save cruise scale
-        CruiseMapScale = GetMapScaleUser();
+        zoomclimb.CruiseMapScale = GetMapScaleUser();
         // switch to climb scale
-        RequestMapScale(ClimbMapScale, SettingsMap());
+        RequestMapScale(zoomclimb.ClimbMapScale, SettingsMap());
       } else {
         // leaving climb
         // save cruise scale
-        ClimbMapScale = GetMapScaleUser();
-        RequestMapScale(CruiseMapScale, SettingsMap());
+        zoomclimb.ClimbMapScale = GetMapScaleUser();
+        RequestMapScale(zoomclimb.CruiseMapScale, SettingsMap());
         // switch to climb scale
       }
       BigZoom = true;
-      last_isclimb = isclimb;
+      zoomclimb.last_isclimb = isclimb;
     }
   }
 }

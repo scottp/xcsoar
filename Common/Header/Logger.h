@@ -35,55 +35,48 @@ Copyright_License {
 }
 */
 
-#if !defined(AFX_LOGGER_H__695AAC30_F401_4CFF_9BD9_FE62A2A2D0D2__INCLUDED_)
-#define AFX_LOGGER_H__695AAC30_F401_4CFF_9BD9_FE62A2A2D0D2__INCLUDED_
+#if !defined(XCSOAR_LOGGER_H)
+#define XCSOAR_LOGGER_H
 
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
 #include <tchar.h>
-#include "SettingsComputer.hpp"
+#include "Poco/RWLock.h"
 
 struct NMEA_INFO;
+struct SETTINGS_COMPUTER;
 
-void StartLogger(const NMEA_INFO &gps_info, 
-		 const SETTINGS_COMPUTER &settings,
-		 const TCHAR *strAssetNumber);
-void LogPoint(const NMEA_INFO &gps_info);
-void AddDeclaration(double Lattitude, double Longditude, const TCHAR *ID);
-void StartDeclaration(const NMEA_INFO &gps_info, 
-		 int numturnpoints);
-void EndDeclaration(void);
-void LoggerHeader(const NMEA_INFO &gps_info);
-void LoggerNote(const TCHAR *text);
-void LoggerDeviceDeclare();
+class LoggerImpl;
 
-bool CheckDeclaration(void);
-bool isTaskDeclared();
-bool isLoggerActive();
+class Logger {
+private:
+  LoggerImpl* _logger; 
+  Poco::RWLock lock;
+public:
+  Logger();
+  ~Logger();
 
-bool LoggerClearFreeSpace(const NMEA_INFO &gps_info);
-void StopLogger(const NMEA_INFO &gps_info);
-bool IGCWriteRecord(const char *szIn, const TCHAR *);
-void LinkGRecordDLL(void);
-bool LoggerGActive();
+  void LogPoint(const NMEA_INFO &gps_info);
+  bool CheckDeclaration(void);
+  const bool isTaskDeclared();
+  const bool isLoggerActive();
+  bool LoggerClearFreeSpace(const NMEA_INFO &gps_info);
+  void LinkGRecordDLL(void);
+  const bool LoggerGActive();
+  void guiStartLogger(const NMEA_INFO& gps_info, 
+                      const SETTINGS_COMPUTER& settings,
+                      bool noAsk = false);
+  void guiToggleLogger(const NMEA_INFO& gps_info, 
+                       const SETTINGS_COMPUTER& settings,
+                       bool noAsk = false);
+  void guiStopLogger(const NMEA_INFO &gps_info,
+                     bool noAsk = false);
+  void LoggerDeviceDeclare();
+  void LoggerNote(const TCHAR *text);
+  void clearBuffer();
+};
 
-bool
-LogFRecordToFile(const int SatelliteIDs[], short Hour, short Minute,
-                 short Second, bool bAlways);
-
-bool
-LogFRecord(const NMEA_INFO &gps_info, bool bAlways);
-
-void SetFRecordLastTime(double dTime);
-double GetFRecordLastTime(void);
-void ResetFRecord(void);
-
-void guiStartLogger(const NMEA_INFO& gps_info, 
-		    const SETTINGS_COMPUTER& settings,
-		    bool noAsk = false);
-void guiStopLogger(const NMEA_INFO &gps_info,
-		   bool noAsk = false);
-void guiToggleLogger(const NMEA_INFO& gps_info, 
-		     const SETTINGS_COMPUTER& settings,
-		     bool noAsk = false);
+extern Logger logger;
 
 #endif
 

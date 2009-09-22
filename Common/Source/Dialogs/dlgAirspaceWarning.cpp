@@ -35,18 +35,14 @@ Copyright_License {
 }
 */
 
-
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "InfoBoxLayout.h"
-#include "Dialogs.h"
-#include "Language.hpp"
 #include "Units.hpp"
 #include "Airspace.h"
 #include "Protection.hpp"
 #include "Math/FastMath.h"
 #include "Math/Units.h"
 #include "MainWindow.hpp"
-#include "Dialogs/dlgTools.h"
 #include "Compatibility/vk.h"
 #include "options.h" /* for IBLSCALE() */
 
@@ -316,8 +312,7 @@ OnAirspaceListItemPaint(WindowControl *Sender, Canvas &canvas)
 
     if (i>=Count) return;
 
-    CopyRect(&rc, Sender->GetBoundRect());
-    CopyRect(&rcTextClip, Sender->GetBoundRect());
+    rc = rcTextClip = Sender->get_client_rect();
     rcTextClip.right = IBLSCALE(Col1Left - 2);
 
     InflateRect(&rc, IBLSCALE(-2), IBLSCALE(-2));

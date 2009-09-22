@@ -35,10 +35,38 @@ Copyright_License {
 }
 */
 
-#ifndef TERRAIN_H
-#define TERRAIN_H
+#ifndef RASTERMAPJPG2000_H
+#define RASTERMAPJPG2000_H
 
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#include "RasterMap.h"
+#include <zzip/lib.h>
+#include "jasper/RasterTile.h"
+
+class RasterMapJPG2000: public RasterMap {
+ public:
+  RasterMapJPG2000();
+  ~RasterMapJPG2000();
+
+  void ReloadJPG2000(void);
+  void ReloadJPG2000Full(const GEOPOINT &location);
+
+  void SetViewCenter(const GEOPOINT &location);
+  virtual void SetFieldRounding(const double xr, const double yr,
+    RasterRounding &rounding);
+  virtual bool Open(char* filename);
+  virtual void Close();
+  void ServiceFullReload(const GEOPOINT &location);
+
+ protected:
+  char jp2_filename[MAX_PATH];
+  virtual short _GetFieldAtXY(unsigned int lx,
+                              unsigned int ly);
+  bool TriggerJPGReload;
+  static int ref_count;
+  RasterTileCache raster_tile_cache;
+  virtual void _Close();
+  virtual void _ReloadJPG2000(void);
+};
+
 
 #endif

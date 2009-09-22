@@ -35,12 +35,32 @@ Copyright_License {
 }
 */
 
-#ifndef XCSOAR_CALCULATIONS_ABORT_HPP
-#define XCSOAR_CALCULATIONS_ABORT_HPP
+#ifndef RASTERMAPRAW_H
+#define RASTERMAPRAW_H
 
-#include "GeoPoint.hpp"
+#include "RasterMap.h"
+#include <zzip/lib.h>
 
-void
-LatLon2Flat(const GEOPOINT &location, int *scx, int *scy);
+#include <windef.h> /* for MAX_PATH */
+
+class RasterMapRaw: public RasterMap {
+ public:
+  RasterMapRaw():
+    TerrainMem(NULL)
+  {
+    DirectAccess = true;
+  }
+  ~RasterMapRaw() {
+  }
+  short *TerrainMem;
+  virtual void SetFieldRounding(const double xr, const double yr,
+    RasterRounding &rounding);
+  virtual bool Open(char* filename);
+  virtual void Close();
+ protected:
+  virtual short _GetFieldAtXY(unsigned int lx,
+                              unsigned int ly);
+  virtual void _Close();
+};
 
 #endif

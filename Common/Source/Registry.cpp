@@ -52,7 +52,6 @@ Copyright_License {
 #include "Math/Units.h"
 #include "Logger.h"
 #include "Device/Parser.h"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
 #include "SettingsUser.hpp"
@@ -424,6 +423,51 @@ void Profile::ReadRegistrySettings(void)
   DefaultRegistrySettingsAltair();
 #endif
 
+  ////////////////////////
+
+  SETTINGS_TASK settings_task = task.getSettings();
+  GetFromRegistry(szRegistryFinishMinHeight,
+		  settings_task.FinishMinHeight );
+  GetFromRegistry(szRegistryStartHeightRef,
+		  settings_task.StartHeightRef );
+  GetFromRegistry(szRegistryStartMaxHeight,
+		  settings_task.StartMaxHeight );
+  GetFromRegistry(szRegistryStartMaxHeightMargin,
+		  settings_task.StartMaxHeightMargin );
+  GetFromRegistry(szRegistryStartMaxSpeed,
+		  settings_task.StartMaxSpeed );
+  GetFromRegistry(szRegistryStartMaxSpeedMargin,
+		  settings_task.StartMaxSpeedMargin );
+
+  Temp = settings_task.SectorType;
+  GetFromRegistryD(szRegistryFAISector, Temp);
+  settings_task.SectorType = (ASTSectorType_t)Temp;
+
+  Temp = settings_task.StartType;
+  GetFromRegistryD(szRegistryStartLine, Temp);
+  settings_task.StartType = (StartSectorType_t)Temp;
+
+  Temp = settings_task.FinishType;
+  GetFromRegistryD(szRegistryFinishLine, Temp);
+  settings_task.FinishType = (FinishSectorType_t)Temp;
+
+  GetFromRegistry(szRegistrySectorRadius,
+                  settings_task.SectorRadius);
+
+  GetFromRegistry(szRegistryStartRadius,
+		  settings_task.StartRadius );
+  GetFromRegistry(szRegistryFinishRadius,
+		  settings_task.FinishRadius );
+
+  Temp = settings_task.AutoAdvance;
+  GetFromRegistryD(szRegistryAutoAdvance,
+		  Temp );
+  settings_task.AutoAdvance = (AutoAdvanceMode_t)Temp;
+
+  GetFromRegistry(szRegistryFAIFinishHeight,
+		  settings_task.EnableFAIFinishHeight );
+  task.setSettings(settings_task);
+
   for (i=0; i<AIRSPACECLASSCOUNT; i++) {
     GetFromRegistry(szRegistryAirspacePriority[i], AirspacePriority[i]);
   }
@@ -495,7 +539,7 @@ void Profile::ReadRegistrySettings(void)
   // check against V3 infotypes
   CheckInfoTypes();
 
-  Temp=0;
+  Temp= SetSettingsMap().DisplayOrientation;
   GetFromRegistryD(szRegistryDisplayUpValue,Temp);
   switch(Temp)
     {
@@ -511,7 +555,7 @@ void Profile::ReadRegistrySettings(void)
       SetSettingsMap().DisplayOrientation = NORTHTRACK;break;
     }
 
-  Temp=0;
+  Temp= SetSettingsMap().DisplayTextType;
   GetFromRegistryD(szRegistryDisplayText,Temp);
   switch(Temp)
     {
@@ -529,9 +573,16 @@ void Profile::ReadRegistrySettings(void)
       SetSettingsMap().DisplayTextType = DISPLAYNAMEIFINTASK; break;
     }
 
-  GetFromRegistry(szRegistryAltMode,AltitudeMode);
-  GetFromRegistry(szRegistryClipAlt,ClipAltitude);
-  GetFromRegistry(szRegistryAltMargin,AltWarningMargin);
+  Temp= SetSettingsComputer().AltitudeMode;
+  GetFromRegistryD(szRegistryAltMode,
+                  Temp);
+  SetSettingsComputer().AltitudeMode= (AirspaceDisplayMode_t)Temp;
+
+  GetFromRegistry(szRegistryClipAlt,
+                  SetSettingsComputer().ClipAltitude);
+  GetFromRegistry(szRegistryAltMargin,
+                  SetSettingsComputer().AltWarningMargin);
+
   GetFromRegistry(szRegistrySafetyAltitudeArrival, 
 		  SetSettingsComputer().SAFETYALTITUDEARRIVAL);
   GetFromRegistry(szRegistrySafetyAltitudeBreakOff,
@@ -540,22 +591,20 @@ void Profile::ReadRegistrySettings(void)
 		  SetSettingsComputer().SAFETYALTITUDETERRAIN);
   GetFromRegistry(szRegistrySafteySpeed,
 		  SetSettingsComputer().SAFTEYSPEED);
-  GetFromRegistry(szRegistryFAISector,SectorType);
-  GetFromRegistry(szRegistrySectorRadius,SectorRadius);
   GetFromRegistry(szRegistryPolarID,POLARID);
 
   GetRegistryString(szRegistryRegKey, strRegKey, 65);
 
   for(i=0;i<AIRSPACECLASSCOUNT;i++) {
-    iAirspaceMode[i] = GetRegistryAirspaceMode(i);
+    SetSettingsComputer().iAirspaceMode[i] = GetRegistryAirspaceMode(i);
     
-    GetFromRegistry(szRegistryBrush[i],iAirspaceBrush[i]);
-    GetFromRegistry(szRegistryColour[i],iAirspaceColour[i]);
-    if (iAirspaceColour[i]>= NUMAIRSPACECOLORS) {
-      iAirspaceColour[i]= 0;
+    GetFromRegistry(szRegistryBrush[i],SetSettingsMap().iAirspaceBrush[i]);
+    GetFromRegistry(szRegistryColour[i],SetSettingsMap().iAirspaceColour[i]);
+    if (SettingsMap().iAirspaceColour[i]>= NUMAIRSPACECOLORS) {
+      SetSettingsMap().iAirspaceColour[i]= 0;
     }
-    if (iAirspaceBrush[i]>= NUMAIRSPACEBRUSHES) {
-      iAirspaceBrush[i]= 0;
+    if (SettingsMap().iAirspaceBrush[i]>= NUMAIRSPACEBRUSHES) {
+      SetSettingsMap().iAirspaceBrush[i]= 0;
     }
   }
 
@@ -617,26 +666,14 @@ void Profile::ReadRegistrySettings(void)
   GetFromRegistry(szRegistryTeamcodeRefWaypoint,
 		  SetSettingsComputer().TeamCodeRefWaypoint );
 
-  GetFromRegistry(szRegistryStartLine,
-		  StartLine );
-
-  GetFromRegistry(szRegistryStartRadius,
-		  StartRadius );
-
-  GetFromRegistry(szRegistryFinishLine,
-		  FinishLine );
-
-  GetFromRegistry(szRegistryFinishRadius,
-		  FinishRadius );
-
   GetFromRegistry(szRegistryAirspaceWarning,
-		  AIRSPACEWARNINGS );
+		  SetSettingsComputer().EnableAirspaceWarnings );
 
   GetFromRegistry(szRegistryWarningTime,
-		  WarningTime );
+		  SetSettingsComputer().WarningTime );
 
   GetFromRegistry(szRegistryAcknowledgementTime,
-		  AcknowledgementTime );
+		  SetSettingsComputer().AcknowledgementTime );
 
   GetFromRegistry(szRegistrySoundVolume,
 		  SetSettingsComputer().SoundVolume );
@@ -822,16 +859,12 @@ void Profile::ReadRegistrySettings(void)
   // IndFinalGlide
   // IndLandable
 
-  GetFromRegistry(szRegistryAutoAdvance,
-		  AutoAdvance );
   GetFromRegistry(szRegistryAutoMcMode,
 		  SetSettingsComputer().AutoMcMode );
   GetFromRegistry(szRegistryWaypointsOutOfRange,
 		  WaypointsOutOfRange );
   GetFromRegistry(szRegistryOLCRules,
 		  SetSettingsComputer().OLCRules );
-  GetFromRegistry(szRegistryFAIFinishHeight,
-		  EnableFAIFinishHeight );
   GetFromRegistry(szRegistryHandicap,
 		  SetSettingsComputer().Handicap );
   GetFromRegistry(szRegistryEnableExternalTriggerCruise,
@@ -890,18 +923,6 @@ void Profile::ReadRegistrySettings(void)
 		  SetSettingsComputer().EnableVoiceInSector );
   GetFromRegistry(szRegistryVoiceAirspace,
 		  SetSettingsComputer().EnableVoiceAirspace );
-  GetFromRegistry(szRegistryFinishMinHeight,
-		  FinishMinHeight );
-  GetFromRegistry(szRegistryStartHeightRef,
-		  StartHeightRef );
-  GetFromRegistry(szRegistryStartMaxHeight,
-		  StartMaxHeight );
-  GetFromRegistry(szRegistryStartMaxHeightMargin,
-		  StartMaxHeightMargin );
-  GetFromRegistry(szRegistryStartMaxSpeed,
-		  StartMaxSpeed );
-  GetFromRegistry(szRegistryStartMaxSpeedMargin,
-		  StartMaxSpeedMargin );
   GetFromRegistry(szRegistryEnableNavBaroAltitude,
 		  SetSettingsComputer().EnableNavBaroAltitude );
   GetFromRegistry(szRegistryLoggerTimeStepCruise,
@@ -1166,17 +1187,17 @@ void SetRegistryBrush(int i, DWORD c)
 
 
 
-void SetRegistryAirspaceMode(int i)
+void Profile::SetRegistryAirspaceMode(int i)
 {
 
-  CheckIndex(iAirspaceMode, i);
+  CheckIndex(SetSettingsComputer().iAirspaceMode, i);
   CheckIndex(szRegistryAirspaceMode, i);
 
-  DWORD val = iAirspaceMode[i];
+  DWORD val = SettingsComputer().iAirspaceMode[i];
   SetToRegistry(szRegistryAirspaceMode[i], val);
 }
 
-int GetRegistryAirspaceMode(int i) {
+int Profile::GetRegistryAirspaceMode(int i) {
   DWORD Temp= 3; // display + warnings
   CheckIndex(szRegistryAirspaceMode, i);
   GetFromRegistryD(szRegistryAirspaceMode[i],Temp);

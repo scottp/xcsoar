@@ -44,6 +44,7 @@ Copyright_License {
 #include "Math/Earth.hpp"
 #include "InfoBoxLayout.h"
 #include "RasterTerrain.h"
+#include "RasterMap.h"
 #include "Language.hpp"
 #include "McReady.h"
 #include "GlideComputer.hpp"
@@ -52,12 +53,10 @@ Copyright_License {
 #include "SettingsTask.hpp"
 #include "SettingsComputer.hpp"
 #include "Task.h"
-#include "WayPoint.hpp"
 #include "Units.hpp"
 #include "Components.hpp"
 #include "Interface.hpp"
 #include "options.h" /* for IBLSCALE() */
-#include "WayPointList.hpp"
 #include "Components.hpp"
 
 void FlightStatistics::Reset() {
@@ -81,7 +80,6 @@ void FlightStatistics::Reset() {
 void FlightStatistics::RenderBarograph(Canvas &canvas, const RECT rc)
 {
   Chart chart(canvas, rc);
-  ScopeLock protect(mutexTaskData);
 
   if (Altitude.sum_n<2) {
     chart.DrawNoData();
@@ -94,8 +92,8 @@ void FlightStatistics::RenderBarograph(Canvas &canvas, const RECT rc)
   chart.ScaleXFromValue(Altitude.x_min+1.0); // in case no data
   chart.ScaleXFromValue(Altitude.x_min);
 
-  for(int j=1;j<MAXTASKPOINTS;j++) {
-    if (ValidTaskPoint(j) && (LegStartTime[j]>=0)) {
+  for(int j=1; task.ValidTaskPoint(j) ;j++) {
+    if (LegStartTime[j]>=0) {
       double xx =
         (LegStartTime[j]-XCSoarInterface::Calculated().TakeOffTime)/3600.0;
       if (xx>=0) {
@@ -106,20 +104,15 @@ void FlightStatistics::RenderBarograph(Canvas &canvas, const RECT rc)
     }
   }
 
-  HPEN   hpHorizonGround;
-  HBRUSH hbHorizonGround;
-  hpHorizonGround = (HPEN)CreatePen(PS_SOLID, IBLSCALE(1),
-                                    Chart::GROUND_COLOUR);
-  hbHorizonGround = (HBRUSH)CreateSolidBrush(Chart::GROUND_COLOUR);
-  SelectObject(canvas, hpHorizonGround);
-  SelectObject(canvas, hbHorizonGround);
+  Pen hpHorizonGround(Pen::SOLID, IBLSCALE(1), Chart::GROUND_COLOUR);
+  Brush hbHorizonGround(Chart::GROUND_COLOUR);
+
+  canvas.select(hpHorizonGround);
+  canvas.select(hbHorizonGround);
 
   chart.DrawFilledLineGraph(&Altitude_Terrain, Chart::GROUND_COLOUR);
   canvas.white_pen();
   canvas.white_brush();
-
-  DeleteObject(hpHorizonGround);
-  DeleteObject(hbHorizonGround);
 
   chart.DrawXGrid(0.5, Altitude.x_min, Chart::STYLE_THINDASHPAPER, 0.5, true);
   chart.DrawYGrid(1000/ALTITUDEMODIFY, 0, Chart::STYLE_THINDASHPAPER, 1000, true);
@@ -136,10 +129,9 @@ void FlightStatistics::RenderBarograph(Canvas &canvas, const RECT rc)
 void FlightStatistics::RenderSpeed(Canvas &canvas, const RECT rc)
 {
   Chart chart(canvas, rc);
-  ScopeLock protect(mutexTaskData);
 
   if ((Task_Speed.sum_n<2)
-      || !ValidTask()) {
+      || !task.Valid()) {
     chart.DrawNoData();
     return;
   }
@@ -150,8 +142,8 @@ void FlightStatistics::RenderSpeed(Canvas &canvas, const RECT rc)
   chart.ScaleXFromValue(Task_Speed.x_min+1.0); // in case no data
   chart.ScaleXFromValue(Task_Speed.x_min);
 
-  for(int j=1;j<MAXTASKPOINTS;j++) {
-    if (ValidTaskPoint(j) && (LegStartTime[j]>=0)) {
+  for(int j=1;task.ValidTaskPoint(j);j++) {
+    if (LegStartTime[j]>=0) {
       double xx =
         (LegStartTime[j]-XCSoarInterface::Calculated().TaskStartTime)/3600.0;
       if (xx>=0) {
@@ -288,7 +280,6 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 {
   int i;
   Chart chart(canvas, rc);
-  ScopeLock protect(mutexTaskData);
 
   double lat1 = 0;
   double lon1 = 0;
@@ -305,15 +296,14 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
   }
   bool nowaypoints = true;
 
-  for (i=0; i<MAXTASKPOINTS; i++) {
-    if (ValidTaskPoint(i)) {
-      lat1 = way_points.get(task_points[i].Index).Location.Latitude;
-      lon1 = way_points.get(task_points[i].Index).Location.Longitude;
-      chart.ScaleYFromValue( lat1);
-      chart.ScaleXFromValue(lon1);
-      nowaypoints = false;
-    }
+  for (i=0; task.ValidTaskPoint(i); i++) {
+    lat1 = task.getTaskPointLocation(i).Latitude;
+    lon1 = task.getTaskPointLocation(i).Longitude;
+    chart.ScaleYFromValue( lat1);
+    chart.ScaleXFromValue(lon1);
+    nowaypoints = false;
   }
+
   if (nowaypoints && !olcmode) {
     chart.DrawNoData();
     return;
@@ -355,45 +345,43 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
   chart.ScaleXFromValue(x1);
   chart.ScaleYFromValue(y1);
 
-  for (i=0; i<MAXTASKPOINTS; i++) {
-    if (ValidTaskPoint(i)) {
-      nwps++;
-      lat1 = way_points.get(task_points[i].Index).Location.Latitude;
-      lon1 = way_points.get(task_points[i].Index).Location.Longitude;
-      x1 = (lon1-lon_c)*fastcosine(lat1);
-      y1 = (lat1-lat_c);
-      chart.ScaleXFromValue(x1);
-      chart.ScaleYFromValue(y1);
-
-      if (AATEnabled) {
-	GEOPOINT aatloc;
-	double bearing;
-	double radius;
-
-        if (ValidTaskPoint(i+1)) {
-          if (task_points[i].AATType == SECTOR) {
-            radius = task_points[i].AATSectorRadius;
-          } else {
-            radius = task_points[i].AATCircleRadius;
-          }
-          for (int j=0; j<4; j++) {
-            bearing = j*360.0/4;
-
-            FindLatitudeLongitude(way_points.get(task_points[i].Index).Location,
-                                  bearing, radius,
-                                  &aatloc);
-            x1 = (aatloc.Longitude-lon_c)*fastcosine(aatloc.Latitude);
-            y1 = (aatloc.Latitude-lat_c);
-            chart.ScaleXFromValue(x1);
-            chart.ScaleYFromValue(y1);
-            if (j==0) {
-              aatradius[i] = fabs(aatloc.Latitude -
-                                  way_points.get(task_points[i].Index).Location.Latitude);
-            }
-          }
+  for (i=0; task.ValidTaskPoint(i); i++) {
+    nwps++;
+    lat1 = task.getTaskPointLocation(i).Latitude;
+    lon1 = task.getTaskPointLocation(i).Longitude;
+    x1 = (lon1-lon_c)*fastcosine(lat1);
+    y1 = (lat1-lat_c);
+    chart.ScaleXFromValue(x1);
+    chart.ScaleYFromValue(y1);
+    
+    if (task.getSettings().AATEnabled) {
+      GEOPOINT aatloc;
+      double bearing;
+      double radius;
+      
+      if (task.ValidTaskPoint(i+1)) {
+        if (task.getTaskPoint(i).AATType == AAT_SECTOR) {
+          radius = task.getTaskPoint(i).AATSectorRadius;
         } else {
-          aatradius[i] = 0;
+          radius = task.getTaskPoint(i).AATCircleRadius;
         }
+        for (int j=0; j<4; j++) {
+          bearing = j*360.0/4;
+          
+          FindLatitudeLongitude(task.getTaskPointLocation(i),
+                                bearing, radius,
+                                &aatloc);
+          x1 = (aatloc.Longitude-lon_c)*fastcosine(aatloc.Latitude);
+          y1 = (aatloc.Latitude-lat_c);
+          chart.ScaleXFromValue(x1);
+          chart.ScaleYFromValue(y1);
+          if (j==0) {
+            aatradius[i] = fabs(aatloc.Latitude -
+                                task.getTaskPointLocation(i).Latitude);
+          }
+        }
+      } else {
+        aatradius[i] = 0;
       }
     }
   }
@@ -412,26 +400,27 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 
   // draw aat areas
   if (!olcmode) {
-    if (AATEnabled) {
+    if (task.getSettings().AATEnabled) {
       for (i=MAXTASKPOINTS-1; i>0; i--) {
-	if (ValidTaskPoint(i)) {
-          lat1 = way_points.get(task_points[i-1].Index).Location.Latitude;
-          lon1 = way_points.get(task_points[i-1].Index).Location.Longitude;
-          lat2 = way_points.get(task_points[i].Index).Location.Latitude;
-          lon2 = way_points.get(task_points[i].Index).Location.Longitude;
+	if (task.ValidTaskPoint(i)) {
+          lat1 = task.getTaskPointLocation(i-1).Latitude;
+          lon1 = task.getTaskPointLocation(i-1).Longitude;
+          lat2 = task.getTaskPointLocation(i).Latitude;
+          lon2 = task.getTaskPointLocation(i).Longitude;
 	  x1 = (lon1-lon_c)*fastcosine(lat1);
 	  y1 = (lat1-lat_c);
 	  x2 = (lon2-lon_c)*fastcosine(lat2);
 	  y2 = (lat2-lat_c);
 
-          canvas.select(MapGfx.GetAirspaceBrushByClass(AATASK));
+          canvas.select(MapGfx.GetAirspaceBrushByClass(AATASK,
+                                                       XCSoarInterface::SettingsMap()));
           canvas.white_pen();
-	  if (task_points[i].AATType == SECTOR) {
+	  if (task.getTaskPoint(i).AATType == AAT_SECTOR) {
 	    canvas.segment(chart.screenX(x2), chart.screenY(y2),
                            chart.screenS(aatradius[i]),
                            rc,
-                           task_points[i].AATStartRadial,
-                           task_points[i].AATFinishRadial);
+                           task.getTaskPoint(i).AATStartRadial,
+                           task.getTaskPoint(i).AATFinishRadial);
 	  } else {
 	    canvas.circle(chart.screenX(x2), chart.screenY(y2),
 			  chart.screenS(aatradius[i]),
@@ -461,15 +450,15 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 
   if (!olcmode) {
     for (i=MAXTASKPOINTS-1; i>0; i--) {
-      if (ValidTaskPoint(i) && ValidTaskPoint(i-1)) {
-        lat1 = way_points.get(task_points[i-1].Index).Location.Latitude;
-        lon1 = way_points.get(task_points[i-1].Index).Location.Longitude;
-	if (TaskIsTemporary()) {
+      if (task.ValidTaskPoint(i) && task.ValidTaskPoint(i-1)) {
+        lat1 = task.getTaskPointLocation(i-1).Latitude;
+        lon1 = task.getTaskPointLocation(i-1).Longitude;
+	if (task.TaskIsTemporary()) {
 	  lat2 = XCSoarInterface::Basic().Location.Latitude;
 	  lon2 = XCSoarInterface::Basic().Location.Longitude;
 	} else {
-          lat2 = way_points.get(task_points[i].Index).Location.Latitude;
-          lon2 = way_points.get(task_points[i].Index).Location.Longitude;
+          lat2 = task.getTaskPointLocation(i).Latitude;
+          lon2 = task.getTaskPointLocation(i).Longitude;
 	}
 	x1 = (lon1-lon_c)*fastcosine(lat1);
 	y1 = (lat1-lat_c);
@@ -480,7 +469,8 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 		       Chart::STYLE_DASHGREEN);
 
 	TCHAR text[100];
-	if ((i==nwps-1) && (task_points[i].Index == task_points[0].Index)) {
+	if ((i==nwps-1) && 
+            (task.getWaypointIndex(i) == task.getWaypointIndex(0))) {
 	  _stprintf(text,TEXT("%0d"),1);
 	  chart.DrawLabel(text, x2, y2);
 	} else {
@@ -488,7 +478,7 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 	  chart.DrawLabel(text, x2, y2);
 	}
 
-	if ((i==ActiveTaskPoint)&&(!AATEnabled)) {
+	if ((i==(int)task.getActiveIndex())&&(!task.getSettings().AATEnabled)) {
 	  lat1 = XCSoarInterface::Basic().Location.Latitude;
 	  lon1 = XCSoarInterface::Basic().Location.Longitude;
 	  x1 = (lon1-lon_c)*fastcosine(lat1);
@@ -502,34 +492,18 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 
     // draw aat task line
 
-    if (AATEnabled) {
-      for (i=MAXTASKPOINTS-1; i>0; i--) {
-	if (ValidTaskPoint(i) && ValidTaskPoint(i-1)) {
-          if (i==1) {
-            lat1 = way_points.get(task_points[i-1].Index).Location.Latitude;
-            lon1 = way_points.get(task_points[i-1].Index).Location.Longitude;
-          } else {
-            lat1 = task_stats[i-1].AATTargetLocation.Latitude;
-            lon1 = task_stats[i-1].AATTargetLocation.Longitude;
-          }
-          lat2 = task_stats[i].AATTargetLocation.Latitude;
-          lon2 = task_stats[i].AATTargetLocation.Longitude;
+    if (task.getSettings().AATEnabled) {
+      for (i=0; task.ValidTaskPoint(i) && task.ValidTaskPoint(i+1); i++) {
+        GEOPOINT loc1 = task.getTargetLocation(i);
+        GEOPOINT loc2 = task.getTargetLocation(i+1);
 
-          /*
-	  if (i==ActiveTaskPoint) {
-	    lat1 = XCSoarInterface::Basic().Location.Latitude;
-	    lon1 = XCSoarInterface::Basic().Location.Longitude;
-	  }
-          */
+        x1 = (loc1.Longitude-lon_c)*fastcosine(loc1.Latitude);
+        y1 = (loc1.Latitude-lat_c);
+        x2 = (loc2.Longitude-lon_c)*fastcosine(loc2.Latitude);
+        y2 = (loc2.Latitude-lat_c);
 
-	  x1 = (lon1-lon_c)*fastcosine(lat1);
-	  y1 = (lat1-lat_c);
-	  x2 = (lon2-lon_c)*fastcosine(lat2);
-	  y2 = (lat2-lat_c);
-
-	  chart.DrawLine(x1, y1, x2, y2,
-			 Chart::STYLE_REDTHICK);
-	}
+        chart.DrawLine(x1, y1, x2, y2,
+                       Chart::STYLE_REDTHICK);
       }
     }
   }
@@ -761,14 +735,14 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
 
   terrain.Lock();
   // want most accurate rounding here
-  terrain.SetTerrainRounding(0,0);
+  RasterRounding rounding(*terrain.GetMap(),0,0);
 
   for (j=0; j< AIRSPACE_SCANSIZE_X; j++) { // scan range
     fj = j*1.0/(AIRSPACE_SCANSIZE_X-1);
     FindLatitudeLongitude(XCSoarInterface::Basic().Location, 
                           acb, range*fj,
                           &d_loc[j]);
-    d_alt[j] = terrain.GetTerrainHeight(d_loc[j]);
+    d_alt[j] = terrain.GetTerrainHeight(d_loc[j], rounding);
     hmax = max(hmax, d_alt[j]);
   }
   terrain.Unlock();
@@ -797,7 +771,7 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
 
   int type;
 
-  Pen mpen(Pen::BLANK, 0, RGB(0xf0,0xf0,0xb0));
+  Pen mpen(Pen::BLANK, 0, Color(0xf0,0xf0,0xb0));
   canvas.select(mpen);
 
   RECT rcd;
@@ -808,8 +782,10 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
     for (j=0; j< AIRSPACE_SCANSIZE_X; j++) { // scan range
       type = d_airspace[i][j];
       if (type>=0) {
-        canvas.select(MapGfx.GetAirspaceBrushByClass(type));
-        canvas.set_text_color(MapGfx.GetAirspaceColourByClass(type));
+        canvas.select(MapGfx.GetAirspaceBrushByClass(type,
+                        XCSoarInterface::SettingsMap()));
+        canvas.set_text_color(MapGfx.GetAirspaceColourByClass(type,
+                        XCSoarInterface::SettingsMap()));
 
 	rcd.left = chart.screenX((j-0.5)*dfj*range);
 	rcd.right = chart.screenX((j+0.5)*dfj*range);
@@ -853,7 +829,7 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
 
   canvas.white_pen();
   canvas.white_brush();
-  SetTextColor(canvas, RGB(0xff,0xff,0xff));
+  canvas.set_text_color(Color(0xff,0xff,0xff));
 
   chart.DrawXGrid(5.0/DISTANCEMODIFY, 0,
 		  Chart::STYLE_THINDASHPAPER, 5.0, true);
@@ -874,7 +850,7 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
   line[2].y = line[0].y-delta/2;
   line[3].x = (line[1].x+line[0].x)/2;
   line[3].y = line[0].y;
-  Polygon(canvas, line, 4);
+  canvas.polygon(line, 4);
 
   chart.DrawXLabel(TEXT("D"));
   chart.DrawYLabel(TEXT("h"));
@@ -949,8 +925,8 @@ FlightStatistics::SetLegStart(const int activewaypoint,
 			      const double time)
 {
   Lock();
-  if (LegStartTime[ActiveTaskPoint]<0) {
-    LegStartTime[ActiveTaskPoint] = time;
+  if (LegStartTime[task.getActiveIndex()]<0) {
+    LegStartTime[task.getActiveIndex()] = time;
   }
   Unlock();
 }
@@ -1088,12 +1064,12 @@ FlightStatistics::CaptionTempTrace(TCHAR *sTmp)
 void
 FlightStatistics::CaptionTask(TCHAR *sTmp)
 {
-  if (!ValidTask()) {
+  if (!task.Valid()) {
     _stprintf(sTmp, gettext(TEXT("No task")));
   } else {
     TCHAR timetext1[100];
     TCHAR timetext2[100];
-    if (AATEnabled) {
+    if (task.getSettings().AATEnabled) {
       Units::TimeToText(timetext1, 
 			(int)XCSoarInterface::Calculated().TaskTimeToGo);
       Units::TimeToText(timetext2, 

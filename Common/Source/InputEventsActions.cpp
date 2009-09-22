@@ -63,7 +63,6 @@ doc/html/advanced/input/ALL		http://xcsoar.sourceforge.net/advanced/input/
 #include "Protection.hpp"
 #include "LogFile.hpp"
 #include "Device/Parser.h"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
 #include "SettingsUser.hpp"
@@ -94,7 +93,6 @@ doc/html/advanced/input/ALL		http://xcsoar.sourceforge.net/advanced/input/
 #include "Language.hpp"
 #include "Task.h"
 #include "Logger.h"
-#include "TaskFile.hpp"
 #include "WayPointList.hpp"
 
 #ifdef PNA
@@ -589,19 +587,19 @@ void InputEvents::eventChangeInfoBoxType(const TCHAR *misc) {
 //   toggle: Toggles between armed and disarmed.
 //   show: Shows current armed state
 void InputEvents::eventArmAdvance(const TCHAR *misc) {
-  if (AutoAdvance>=2) {
+  if (task.getSettings().AutoAdvance>=2) {
     if (_tcscmp(misc, TEXT("on")) == 0) {
-      AdvanceArmed = true;
+      task.setAdvanceArmed(true);
     }
     if (_tcscmp(misc, TEXT("off")) == 0) {
-      AdvanceArmed = false;
+      task.setAdvanceArmed(false);
     }
     if (_tcscmp(misc, TEXT("toggle")) == 0) {
-      AdvanceArmed = !AdvanceArmed;
+      task.setAdvanceArmed(!task.isAdvanceArmed());
     }
   }
   if (_tcscmp(misc, TEXT("show")) == 0) {
-    switch (AutoAdvance) {
+    switch (task.getSettings().AutoAdvance) {
     case 0:
       Message::AddMessage(TEXT("Auto Advance: Manual"));
       break;
@@ -609,15 +607,15 @@ void InputEvents::eventArmAdvance(const TCHAR *misc) {
       Message::AddMessage(TEXT("Auto Advance: Automatic"));
       break;
     case 2:
-      if (AdvanceArmed) {
+      if (task.isAdvanceArmed()) {
         Message::AddMessage(TEXT("Auto Advance: ARMED"));
       } else {
         Message::AddMessage(TEXT("Auto Advance: DISARMED"));
       }
       break;
     case 3:
-      if (ActiveTaskPoint<2) { // past start (but can re-start)
-        if (AdvanceArmed) {
+      if (task.getActiveIndex()<2) { // past start (but can re-start)
+        if (task.isAdvanceArmed()) {
           Message::AddMessage(TEXT("Auto Advance: ARMED"));
         } else {
           Message::AddMessage(TEXT("Auto Advance: DISARMED"));
@@ -735,12 +733,10 @@ void InputEvents::eventAnalysis(const TCHAR *misc) {
 void InputEvents::eventWaypointDetails(const TCHAR *misc) {
 
   if (_tcscmp(misc, TEXT("current")) == 0) {
-    mutexTaskData.Lock();
-    if (ValidTask()) {
-      SelectedWaypoint = task_points[ActiveTaskPoint].Index;
+    if (task.Valid()) {
+      task.setSelected();
     }
-    mutexTaskData.Unlock();
-    if (SelectedWaypoint<0){
+    if (task.getSelected()<0){
       Message::AddMessage(TEXT("No Active Waypoint!"));
       return;
     }
@@ -748,9 +744,8 @@ void InputEvents::eventWaypointDetails(const TCHAR *misc) {
   } else
     if (_tcscmp(misc, TEXT("select")) == 0) {
       int res = dlgWayPointSelect(Basic().Location);
-
       if (res != -1){
-	SelectedWaypoint = res;
+	task.setSelected(res);
 	PopupWaypointDetails();
       };
 
@@ -761,7 +756,7 @@ void InputEvents::eventWaypointDetails(const TCHAR *misc) {
 void InputEvents::eventGotoLookup(const TCHAR *misc) {
   int res = dlgWayPointSelect(Basic().Location);
   if (res != -1){
-    FlyDirectTo(res, SettingsComputer());
+    task.FlyDirectTo(res, SettingsComputer());
   };
 }
 
@@ -805,31 +800,6 @@ void InputEvents::eventMacCready(const TCHAR *misc) {
     Message::AddMessage(TEXT("MacCready "), Temp);
   }
 }
-
-
-// Allows forcing of flight mode (final glide)
-void InputEvents::eventFlightMode(const TCHAR *misc) {
-  if (_tcscmp(misc, TEXT("finalglide on")) == 0) {
-    ForceFinalGlide = true;
-  }
-  if (_tcscmp(misc, TEXT("finalglide off")) == 0) {
-    ForceFinalGlide = false;
-  }
-  if (_tcscmp(misc, TEXT("finalglide toggle")) == 0) {
-    ForceFinalGlide = !ForceFinalGlide;
-  }
-  if (_tcscmp(misc, TEXT("show")) == 0) {
-    if (ForceFinalGlide) {
-      Message::AddMessage(TEXT("Final glide forced ON"));
-    } else {
-      Message::AddMessage(TEXT("Final glide automatic"));
-    }
-  }
-  if (ForceFinalGlide && ActiveTaskPoint == -1){
-    Message::AddMessage(TEXT("No Active Waypoint!"));
-  }
-}
-
 
 
 // Wind
@@ -1059,23 +1029,21 @@ void InputEvents::eventAdjustWaypoint(const TCHAR *misc) {
 // toggle: toggles between abort and resume
 // show: displays a status message showing the task abort status
 void InputEvents::eventAbortTask(const TCHAR *misc) {
-  mutexTaskData.Lock();
   if (_tcscmp(misc, TEXT("abort")) == 0)
-    ResumeAbortTask(SettingsComputer(), 1);
+    task.ResumeAbortTask(SettingsComputer(), 1);
   else if (_tcscmp(misc, TEXT("resume")) == 0)
-    ResumeAbortTask(SettingsComputer(), -1);
+    task.ResumeAbortTask(SettingsComputer(), -1);
   else if (_tcscmp(misc, TEXT("show")) == 0) {
-    if (isTaskAborted())
+    if (task.isTaskAborted())
       Message::AddMessage(TEXT("Task Aborted"));
-    else if (TaskIsTemporary()) {
+    else if (task.TaskIsTemporary()) {
       Message::AddMessage(TEXT("Task Temporary"));
     } else {
       Message::AddMessage(TEXT("Task Resume"));
     }
   } else {
-    ResumeAbortTask(SettingsComputer(), 0);
+    task.ResumeAbortTask(SettingsComputer(), 0);
   }
-  mutexTaskData.Unlock();
 }
 
 #include "Device/device.h"
@@ -1174,30 +1142,23 @@ void InputEvents::eventLogger(const TCHAR *misc) {
   // TODO feature: start logger without requiring feedback
   // start stop toggle addnote
 
-  // This StartupStore code is to track down events leading to "missing logger file" bug
-  TCHAR szMessage[MAX_PATH] = TEXT("\0");
-  _tcsncpy(szMessage, TEXT("eventLogger: "),MAX_PATH);
-  _tcsncat(szMessage, misc,MAX_PATH);
-  _tcsncat(szMessage,TEXT("\r\n"),MAX_PATH);
-  StartupStore(szMessage);
-
   if (_tcscmp(misc, TEXT("start ask")) == 0) {
-    guiStartLogger(Basic(),SettingsComputer());
+    logger.guiStartLogger(Basic(),SettingsComputer());
     return;
   } else if (_tcscmp(misc, TEXT("start")) == 0) {
-    guiStartLogger(Basic(),SettingsComputer(),true);
+    logger.guiStartLogger(Basic(),SettingsComputer(),true);
     return;
   } else if (_tcscmp(misc, TEXT("stop ask")) == 0) {
-    guiStopLogger(Basic());
+    logger.guiStopLogger(Basic());
     return;
   } else if (_tcscmp(misc, TEXT("stop")) == 0) {
-    guiStopLogger(Basic(),true);
+    logger.guiStopLogger(Basic(),true);
     return;
   } else if (_tcscmp(misc, TEXT("toggle ask")) == 0) {
-    guiToggleLogger(Basic(),SettingsComputer());
+    logger.guiToggleLogger(Basic(),SettingsComputer());
     return;
   } else if (_tcscmp(misc, TEXT("toggle")) == 0) {
-    guiToggleLogger(Basic(), SettingsComputer(),true);
+    logger.guiToggleLogger(Basic(), SettingsComputer(),true);
     return;
   } else if (_tcscmp(misc, TEXT("nmea")) == 0) {
     EnableLogNMEA = !EnableLogNMEA;
@@ -1208,14 +1169,14 @@ void InputEvents::eventLogger(const TCHAR *misc) {
     }
     return;
   } else if (_tcscmp(misc, TEXT("show")) == 0) {
-    if (isLoggerActive()) {
+    if (logger.isLoggerActive()) {
       Message::AddMessage(TEXT("Logger ON"));
     } else {
       Message::AddMessage(TEXT("Logger OFF"));
     }
   } else if (_tcsncmp(misc, TEXT("note"), 4)==0) {
     // add note to logger file if available..
-    LoggerNote(misc+4);
+    logger.LoggerNote(misc+4);
   }
 }
 
@@ -1259,9 +1220,10 @@ void InputEvents::eventNearestAirspaceDetails(const TCHAR *misc) {
   }
 
   StartHourglassCursor();
-  FindNearestAirspace(main_window.map,
-		      Basic().Location, 
-		      &nearestdistance, &nearestbearing,
+  FindNearestAirspace(Basic().Location,
+                      SettingsComputer(),
+                      MapProjection(),
+                      &nearestdistance, &nearestbearing,
 		      &foundcircle, &foundarea);
   StopHourglassCursor();
 
@@ -1359,10 +1321,8 @@ void InputEvents::eventNull(const TCHAR *misc) {
 void InputEvents::eventTaskLoad(const TCHAR *misc) {
   TCHAR buffer[MAX_PATH];
   if (_tcslen(misc)>0) {
-    mutexTaskData.Lock();
     LocalPath(buffer,misc);
-    LoadNewTask(buffer, SettingsComputer());
-    mutexTaskData.Unlock();
+    task.LoadNewTask(buffer, SettingsComputer());
   }
 }
 
@@ -1371,10 +1331,8 @@ void InputEvents::eventTaskLoad(const TCHAR *misc) {
 void InputEvents::eventTaskSave(const TCHAR *misc) {
   TCHAR buffer[MAX_PATH];
   if (_tcslen(misc)>0) {
-    mutexTaskData.Lock();
     LocalPath(buffer, misc);
-    SaveTask(buffer);
-    mutexTaskData.Unlock();
+    task.SaveTask(buffer);
   }
 }
 
@@ -1635,19 +1593,19 @@ void InputEvents::eventUserDisplayModeForce(const TCHAR *misc){
 void InputEvents::eventAirspaceDisplayMode(const TCHAR *misc){
 
   if (_tcscmp(misc, TEXT("all")) == 0){
-    AltitudeMode = ALLON;
+    SetSettingsComputer().AltitudeMode = ALLON;
   }
   else if (_tcscmp(misc, TEXT("clip")) == 0){
-    AltitudeMode = CLIP;
+    SetSettingsComputer().AltitudeMode = CLIP;
   }
   else if (_tcscmp(misc, TEXT("auto")) == 0){
-    AltitudeMode = AUTO;
+    SetSettingsComputer().AltitudeMode = AUTO;
   }
   else if (_tcscmp(misc, TEXT("below")) == 0){
-    AltitudeMode = ALLBELOW;
+    SetSettingsComputer().AltitudeMode = ALLBELOW;
   }
   else if (_tcscmp(misc, TEXT("off")) == 0){
-    AltitudeMode = ALLOFF;
+    SetSettingsComputer().AltitudeMode = ALLOFF;
   }
 }
 
@@ -1655,7 +1613,6 @@ void InputEvents::eventAirspaceDisplayMode(const TCHAR *misc){
 void InputEvents::eventAddWaypoint(const TCHAR *misc) {
   static int tmpWaypointNum = 0;
   WAYPOINT edit_waypoint;
-  mutexTaskData.Lock();
   edit_waypoint.Location = Basic().Location;
   edit_waypoint.Altitude = Calculated().TerrainAlt;
   edit_waypoint.FileNum = 2; // don't put into file
@@ -1668,11 +1625,11 @@ void InputEvents::eventAddWaypoint(const TCHAR *misc) {
   edit_waypoint.Details = 0;
   edit_waypoint.Number = 0;
 
+  // TODO: protect inner function with lock
   int i = way_points.append(edit_waypoint);
   if (i >= 0)
     _stprintf(way_points.set(i).Name, TEXT("_%d"), ++tmpWaypointNum);
 
-  mutexTaskData.Unlock();
 }
 
 

@@ -55,7 +55,6 @@ Copyright_License {
 #include "Math/Units.h"
 #include "Registry.hpp"
 #include "Screen/Blank.hpp"
-#include "Settings.hpp"
 #include "SettingsTask.hpp"
 #include "SettingsUser.hpp"
 #include "SettingsComputer.hpp"
@@ -320,17 +319,18 @@ void InfoBoxManager::Show() {
   }
 }
 
-int InfoBoxManager::FindInfoBox(HWND hWnd)
+int
+InfoBoxManager::GetFocused()
 {
   for (unsigned i = 0; i < numInfoWindows; i++)
-    if (hWnd == (HWND)*InfoBoxes[i])
+    if (InfoBoxes[i]->has_focus())
       return i;
 
   return -1;
 }
 
 void InfoBoxManager::Event_Select(int i) {
-  int InfoFocus = FindInfoBox(::GetFocus());
+  int InfoFocus = GetFocused();
 
   if (InfoFocus < 0) {
     InfoFocus = i >= 0 ? 0 : numInfoWindows - 1;
@@ -449,7 +449,7 @@ void InfoBoxManager::setType(unsigned i, char j)
 void InfoBoxManager::Event_Change(int i) {
   int j=0, k;
 
-  int InfoFocus = FindInfoBox(::GetFocus());
+  int InfoFocus = GetFocused();
   if (InfoFocus<0) {
     return;
   }
@@ -502,8 +502,8 @@ void InfoBoxManager::DisplayInfoBox(void)
 
     bool needupdate = ((DisplayType[i] != DisplayTypeLast[i])||first);
 
-    int theactive = ActiveTaskPoint;
-    if (!ValidTaskPoint(theactive)) {
+    int theactive = task.getActiveIndex();
+    if (!task.ValidTaskPoint(theactive)) {
       theactive = -1;
     }
 
@@ -605,13 +605,11 @@ void InfoBoxManager::DisplayInfoBox(void)
     case 14: // Next waypoint
 
       if (theactive != -1){
-        int index;
-        index = task_points[theactive].Index;
-        if (index>=0) {
+        int index = task.getWaypointIndex();
+        if ((index>=0)&& way_points.verify_index(index)) {
           InfoBoxes[i]->
             SetComment(way_points.get(index).Comment);
         }
-        break;
       }
       InfoBoxes[i]->SetComment(TEXT(""));
       break;
@@ -850,7 +848,7 @@ void InfoBoxManager::DisplayInfoBox(void)
 void InfoBoxManager::ProcessKey(int keycode) {
   unsigned i;
 
-  int InfoFocus = FindInfoBox(::GetFocus());
+  int InfoFocus = GetFocused();
   if (InfoFocus<0) return; // paranoid
 
   InputEvents::HideMenu();
@@ -874,7 +872,7 @@ void InfoBoxManager::DestroyInfoBoxFormatters() {
 }
 
 bool InfoBoxManager::IsFocus() {
-  return FindInfoBox(::GetFocus()) >= 0;
+  return GetFocused() >= 0;
 }
 
 void InfoBoxManager::InfoBoxDrawIfDirty(void) {

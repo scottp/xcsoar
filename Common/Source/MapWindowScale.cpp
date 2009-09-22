@@ -36,14 +36,12 @@ Copyright_License {
 */
 
 #include "MapWindow.h"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsUser.hpp"
 #include "SettingsTask.hpp"
 #include "InfoBoxLayout.h"
 #include <math.h>
 #include "Math/FastMath.h"
-#include "Screen/Util.hpp"
 #include "Screen/Graphics.hpp"
 #include "Screen/Fonts.hpp"
 #include "McReady.h"
@@ -51,7 +49,6 @@ Copyright_License {
 #include "options.h" /* for IBLSCALE() */
 #include "RasterTerrain.h"
 #include "RasterWeather.h"
-#include "Logger.h"
 
 double MapWindow::findMapScaleBarSize(const RECT rc) {
   double pixelsize = DistanceScreenToUser(1); // units/pixel

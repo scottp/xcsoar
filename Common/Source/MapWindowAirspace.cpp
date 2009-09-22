@@ -38,7 +38,6 @@ Copyright_License {
 #include "MapWindow.h"
 #include "Airspace.h"
 #include "XCSoar.h"
-#include "Screen/Util.hpp"
 #include "Math/FastMath.h"
 #include "SettingsUser.hpp"
 #include "Screen/Graphics.hpp"
@@ -47,7 +46,7 @@ Copyright_License {
 void MapWindow::CalculateScreenPositionsAirspaceCircle(AIRSPACE_CIRCLE &circ) {
   circ.Visible = false;
   if (!circ.FarVisible) return;
-  if (iAirspaceMode[circ.Type]%2 == 1) {
+  if (SettingsComputer().iAirspaceMode[circ.Type]%2 == 1) {
     double basealt;
     double topalt;
     if (circ.Base.Base != abAGL) {
@@ -60,13 +59,13 @@ void MapWindow::CalculateScreenPositionsAirspaceCircle(AIRSPACE_CIRCLE &circ) {
     } else {
       topalt = circ.Top.AGL + Calculated().TerrainAlt;
     }
-    if(CheckAirspaceAltitude(basealt, topalt)) {
+    if(CheckAirspaceAltitude(basealt, topalt, SettingsComputer())) {
 
       if (msRectOverlap(&circ.bounds, &screenbounds_latlon)
           || msRectContained(&screenbounds_latlon, &circ.bounds)) {
 
 	if (!circ._NewWarnAckNoBrush &&
-	    !(iAirspaceBrush[circ.Type] == NUMAIRSPACEBRUSHES-1)) {
+	    !(SettingsMap().iAirspaceBrush[circ.Type] == NUMAIRSPACEBRUSHES-1)) {
 	  circ.Visible = 2;
 	} else {
 	  circ.Visible = 1;
@@ -83,7 +82,7 @@ void MapWindow::CalculateScreenPositionsAirspaceCircle(AIRSPACE_CIRCLE &circ) {
 void MapWindow::CalculateScreenPositionsAirspaceArea(AIRSPACE_AREA &area) {
   area.Visible = false;
   if (!area.FarVisible) return;
-  if (iAirspaceMode[area.Type]%2 == 1) {
+  if (SettingsComputer().iAirspaceMode[area.Type]%2 == 1) {
     double basealt;
     double topalt;
     if (area.Base.Base != abAGL) {
@@ -96,7 +95,7 @@ void MapWindow::CalculateScreenPositionsAirspaceArea(AIRSPACE_AREA &area) {
     } else {
       topalt = area.Top.AGL + Calculated().TerrainAlt;
     }
-    if(CheckAirspaceAltitude(basealt, topalt)) {
+    if(CheckAirspaceAltitude(basealt, topalt, SettingsComputer())) {
       if (msRectOverlap(&area.bounds, &screenbounds_latlon)
           || msRectContained(&screenbounds_latlon, &area.bounds)) {
         AIRSPACE_POINT *ap= AirspacePoint+area.FirstPoint;
@@ -109,7 +108,7 @@ void MapWindow::CalculateScreenPositionsAirspaceArea(AIRSPACE_AREA &area) {
           sp++;
         }
 	if (!area._NewWarnAckNoBrush &&
-	    !(iAirspaceBrush[area.Type] == NUMAIRSPACEBRUSHES-1)) {
+	    !(SettingsMap().iAirspaceBrush[area.Type] == NUMAIRSPACEBRUSHES-1)) {
 	  area.Visible = 2;
 	} else {
 	  area.Visible = 1;
@@ -165,9 +164,9 @@ void MapWindow::DrawAirSpace(Canvas &canvas, const RECT rc, Canvas &buffer)
 	  found = true;
 	}
         // this color is used as the black bit
-        buffer.set_text_color(MapGfx.Colours[iAirspaceColour[AirspaceCircle[i].Type]]);
+        buffer.set_text_color(MapGfx.Colours[SettingsMap().iAirspaceColour[AirspaceCircle[i].Type]]);
         // get brush, can be solid or a 1bpp bitmap
-        buffer.select(MapGfx.hAirspaceBrushes[iAirspaceBrush[AirspaceCircle[i].Type]]);
+        buffer.select(MapGfx.hAirspaceBrushes[SettingsMap().iAirspaceBrush[AirspaceCircle[i].Type]]);
         buffer.circle(AirspaceCircle[i].Screen.x, AirspaceCircle[i].Screen.y,
                       AirspaceCircle[i].ScreenR);
       }
@@ -182,8 +181,8 @@ void MapWindow::DrawAirSpace(Canvas &canvas, const RECT rc, Canvas &buffer)
 	  found = true;
 	}
         // this color is used as the black bit
-        buffer.set_text_color(MapGfx.Colours[iAirspaceColour[AirspaceArea[i].Type]]);
-        buffer.select(MapGfx.hAirspaceBrushes[iAirspaceBrush[AirspaceArea[i].Type]]);
+        buffer.set_text_color(MapGfx.Colours[SettingsMap().iAirspaceColour[AirspaceArea[i].Type]]);
+        buffer.select(MapGfx.hAirspaceBrushes[SettingsMap().iAirspaceBrush[AirspaceArea[i].Type]]);
         buffer.polygon(AirspaceScreenPoint+AirspaceArea[i].FirstPoint,
                                AirspaceArea[i].NumPoints);
       }

@@ -35,9 +35,8 @@ Copyright_License {
 }
 */
 
-#include "Dialogs.h"
+#include "Dialogs/Internal.hpp"
 #include "XCSoar.h"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
 #include "DataField/FileReader.hpp"
 #include "LogFile.hpp"
@@ -51,9 +50,6 @@ static WndOwnerDrawFrame *wSplash=NULL;
 static void
 OnSplashPaint(WindowControl *Sender, Canvas &canvas)
 {
-  RECT  rc;
-  CopyRect(&rc, Sender->GetBoundRect());
-
   Bitmap splash_bitmap(IDB_DISCLAIMER);
   BitmapCanvas bitmap_canvas(canvas, splash_bitmap);
   canvas.stretch(bitmap_canvas, 0, 0, 318, 163);

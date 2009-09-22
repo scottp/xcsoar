@@ -38,37 +38,56 @@ Copyright_License {
 #ifndef XCSOAR_SETTINGS_TASK_HPP
 #define XCSOAR_SETTINGS_TASK_HPP
 
-#include "Sizes.h"
-#include "Task.h"
 
-// control of task/waypoints
-extern int  AutoAdvance;
-extern bool AdvanceArmed;
-extern int  ActiveTaskPoint;
-extern int  SelectedWaypoint;
+typedef enum {
+  AUTOADVANCE_MANUAL=0,
+  AUTOADVANCE_AUTO,
+  AUTOADVANCE_ARM,
+  AUTOADVANCE_ARMSTART
+} AutoAdvanceMode_t;
 
-extern Start_t        task_start_points;
-extern StartStats_t   task_start_stats;
-extern Task_t         task_points;
-extern TaskStats_t    task_stats;
+typedef enum {
+  START_CIRCLE=0,
+  START_LINE,
+  START_SECTOR
+} StartSectorType_t;
 
-extern unsigned SectorType;
-extern unsigned int SectorRadius;
-extern unsigned StartLine;
-extern unsigned StartRadius;
-extern unsigned FinishLine;
-extern unsigned FinishRadius;
-extern double AATTaskLength;
-extern bool AATEnabled;
-extern bool EnableFAIFinishHeight;
-extern unsigned FinishMinHeight;
-extern unsigned StartMaxHeight;
-extern unsigned StartMaxHeightMargin;
-extern unsigned StartMaxSpeed;
-extern unsigned StartMaxSpeedMargin;
-extern bool EnableMultipleStartPoints;
-extern int  StartHeightRef;
-extern bool   ForceFinalGlide;
+typedef enum {
+  FINISH_CIRCLE=0,
+  FINISH_LINE,
+  FINISH_SECTOR
+} FinishSectorType_t;
 
+typedef enum {
+  AAT_CIRCLE=0,
+  AAT_SECTOR
+} AATSectorType_t;
+
+typedef enum {
+  AST_CIRCLE=0,
+  AST_FAI,
+  AST_DAE
+} ASTSectorType_t;
+
+
+struct SETTINGS_TASK {
+  AutoAdvanceMode_t AutoAdvance;
+  ASTSectorType_t SectorType;
+  unsigned int SectorRadius;
+  StartSectorType_t StartType;
+  unsigned StartRadius;
+  FinishSectorType_t FinishType;
+  unsigned FinishRadius;
+  double AATTaskLength;
+  bool AATEnabled;
+  bool EnableMultipleStartPoints;
+  bool EnableFAIFinishHeight;
+  unsigned FinishMinHeight;
+  unsigned StartMaxHeight;
+  unsigned StartMaxHeightMargin;
+  unsigned StartMaxSpeed;
+  unsigned StartMaxSpeedMargin;
+  int  StartHeightRef;
+};
 
 #endif

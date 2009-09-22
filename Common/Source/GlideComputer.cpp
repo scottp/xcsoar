@@ -104,7 +104,6 @@ void GlideComputer::DoLogging()
 
 bool GlideComputer::ProcessGPS()
 {
-
   double mc = GlidePolar::GetMacCready();
   double ce = GlidePolar::GetCruiseEfficiency();
 
@@ -158,7 +157,7 @@ GlideComputer::ProcessIdle()
 
   CalculateWaypointReachable();
 
-  if (!TaskIsTemporary()) {
+  if (!task.TaskIsTemporary()) {
     double mc = GlidePolar::GetMacCready();
     InSector();
     DoAutoMacCready(mc);
@@ -200,7 +199,6 @@ GlideComputer::SetLegStart()
 #include "Math/NavFunctions.hpp" // used for team code
 #include "InputEvents.h"
 #include "SettingsComputer.hpp"
-#include "Settings.hpp"
 #include "WayPoint.hpp"
 #include "PeriodClock.hpp"
 #include "Math/Earth.hpp"
@@ -237,7 +235,6 @@ GlideComputer::CalculateOwnTeamCode()
 void
 GlideComputer::CalculateTeammateBearingRange()
 {
-  ScopeLock protect(mutexTaskData);
   static bool InTeamSector = false;
 
   if (SettingsComputer().TeamCodeRefWaypoint < 0) return;
@@ -325,14 +322,12 @@ GlideComputer::FLARM_ScanTraffic()
 {
   if (Basic().FLARM_Available) {
 
-    ScopeLock protect(mutexTaskData);
-
     for (int flarm_slot=0; flarm_slot<FLARM_MAX_TRAFFIC; flarm_slot++) {
       if (Basic().FLARM_Traffic[flarm_slot].ID>0) {
 	// JMW TODO: this is dangerous, it uses the task!
 	// it should be done outside the parser/comms thread
 	if ((Basic().FLARM_Traffic[flarm_slot].ID == SettingsComputer().TeamFlarmIdTarget)
-	    && ValidWayPoint(SettingsComputer().TeamCodeRefWaypoint)) {
+	    && way_points.verify_index(SettingsComputer().TeamCodeRefWaypoint)) {
 	  double bearing;
 	  double distance;
 	  

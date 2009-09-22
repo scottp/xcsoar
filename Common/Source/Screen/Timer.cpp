@@ -35,7 +35,25 @@ Copyright_License {
 }
 */
 
-#ifndef XCSOAR_SETTINGS_HPP
-#define XCSOAR_SETTINGS_HPP
+#include "Screen/Timer.hpp"
+#include "Screen/Window.hpp"
 
-#endif
+SDLTimer::SDLTimer(Window &_window, unsigned ms)
+  :window(_window), id(::SDL_AddTimer(ms, callback, this))
+{
+}
+
+SDLTimer::~SDLTimer()
+{
+  ::SDL_RemoveTimer(id);
+}
+
+Uint32
+SDLTimer::callback(Uint32 interval, void *param)
+{
+  SDLTimer *timer = (SDLTimer *)param;
+
+  timer->window.on_timer(timer);
+
+  return interval;
+}

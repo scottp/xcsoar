@@ -39,11 +39,9 @@ Copyright_License {
 #include "MainWindow.hpp"
 #include "MapWindow.h"
 #include "Protection.hpp"
-#include "Settings.hpp"
 #include "SettingsUser.hpp"
 #include "Device/Parser.h"
 #include "Gauge/GaugeVario.hpp"
-#include "Logger.h"
 #include "Calculations.h"
 #include "Interface.hpp"
 #include "Components.hpp"
@@ -62,10 +60,6 @@ Trigger triggerClimbEvent(TEXT("triggerClimb"));
 
 Mutex mutexBlackboard;
 // protect GPS_INFO, mcready etc,
-// should be fast
-Mutex TerrainDataClient::mutexTerrainData;
-Mutex mutexComm;
-Mutex mutexTaskData;
 
 //////////
 

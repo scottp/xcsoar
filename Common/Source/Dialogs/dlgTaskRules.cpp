@@ -35,21 +35,18 @@ Copyright_License {
 }
 */
 
-#include "Dialogs.h"
-#include "Language.hpp"
+#include "Dialogs/Internal.hpp"
 #include "XCSoar.h"
 #include "SettingsTask.hpp"
 #include "UtilsProfile.hpp"
-#include "Dialogs/dlgTools.h"
 #include "Registry.hpp"
 #include "Math/FastMath.h"
 #include "DataField/Enum.hpp"
 #include "MainWindow.hpp"
-#include "Dialogs/dlgHelpers.hpp"
 
 static bool changed = false;
 static WndForm *wf=NULL;
-
+static SETTINGS_TASK settings_task;
 
 static void OnRulesActiveData(DataField *Sender,
 			      DataField::DataAccessKind_t Mode){
@@ -90,7 +87,7 @@ static void setVariables(void) {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpFAIFinishHeight"));
   if (wp) {
-    wp->GetDataField()->Set(EnableFAIFinishHeight);
+    wp->GetDataField()->Set(settings_task.EnableFAIFinishHeight);
     wp->RefreshDisplay();
   }
 
@@ -100,7 +97,7 @@ static void setVariables(void) {
     dfe = (DataFieldEnum*)wp->GetDataField();
     dfe->addEnumText(gettext(TEXT("AGL")));
     dfe->addEnumText(gettext(TEXT("MSL")));
-    dfe->Set(StartHeightRef);
+    dfe->Set(settings_task.StartHeightRef);
     wp->RefreshDisplay();
   }
 
@@ -117,21 +114,21 @@ static void setVariables(void) {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpFinishMinHeight"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(iround(FinishMinHeight*ALTITUDEMODIFY));
+    wp->GetDataField()->SetAsFloat(iround(settings_task.FinishMinHeight*ALTITUDEMODIFY));
     wp->GetDataField()->SetUnits(Units::GetAltitudeName());
     wp->RefreshDisplay();
   }
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpStartMaxHeight"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(iround(StartMaxHeight*ALTITUDEMODIFY));
+    wp->GetDataField()->SetAsFloat(iround(settings_task.StartMaxHeight*ALTITUDEMODIFY));
     wp->GetDataField()->SetUnits(Units::GetAltitudeName());
     wp->RefreshDisplay();
   }
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpStartMaxSpeed"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(iround(StartMaxSpeed*SPEEDMODIFY));
+    wp->GetDataField()->SetAsFloat(iround(settings_task.StartMaxSpeed*SPEEDMODIFY));
     wp->GetDataField()->SetUnits(Units::GetHorizontalSpeedName());
     wp->RefreshDisplay();
   }
@@ -149,6 +146,8 @@ bool dlgTaskRules(void){
 
   if (!wf) return false;
 
+  settings_task = task.getSettings();
+
   setVariables();
 
   changed = false;
@@ -161,10 +160,10 @@ bool dlgTaskRules(void){
 
   changed |= SetValueRegistryOnChange(wf, TEXT("prpFAIFinishHeight"),
 				      szRegistryFAIFinishHeight,
-				      EnableFAIFinishHeight);
+				      settings_task.EnableFAIFinishHeight);
   changed |= SetValueRegistryOnChange(wf, TEXT("prpStartHeightRef"),
 				      szRegistryStartHeightRef,
-				      StartHeightRef);
+				      settings_task.StartHeightRef);
   changed |= SetValueRegistryOnChange(wf, TEXT("prpOLCRules"),
 				      szRegistryOLCRules,
 				      XCSoarInterface::SetSettingsComputer().OLCRules);
@@ -174,9 +173,9 @@ bool dlgTaskRules(void){
   wp = (WndProperty*)wf->FindByName(TEXT("prpFinishMinHeight"));
   if (wp) {
     ival = iround(wp->GetDataField()->GetAsInteger()/ALTITUDEMODIFY);
-    if ((int)FinishMinHeight != ival) {
-      FinishMinHeight = ival;
-      SetToRegistry(szRegistryFinishMinHeight,FinishMinHeight);
+    if ((int)settings_task.FinishMinHeight != ival) {
+      settings_task.FinishMinHeight = ival;
+      SetToRegistry(szRegistryFinishMinHeight,settings_task.FinishMinHeight);
       changed = true;
     }
   }
@@ -184,9 +183,9 @@ bool dlgTaskRules(void){
   wp = (WndProperty*)wf->FindByName(TEXT("prpStartMaxHeight"));
   if (wp) {
     ival = iround(wp->GetDataField()->GetAsInteger()/ALTITUDEMODIFY);
-    if ((int)StartMaxHeight != ival) {
-      StartMaxHeight = ival;
-      SetToRegistry(szRegistryStartMaxHeight,StartMaxHeight);
+    if ((int)settings_task.StartMaxHeight != ival) {
+      settings_task.StartMaxHeight = ival;
+      SetToRegistry(szRegistryStartMaxHeight,settings_task.StartMaxHeight);
       changed = true;
     }
   }
@@ -194,9 +193,9 @@ bool dlgTaskRules(void){
   wp = (WndProperty*)wf->FindByName(TEXT("prpStartMaxSpeed"));
   if (wp) {
     ival = iround(wp->GetDataField()->GetAsInteger()/SPEEDMODIFY);
-    if ((int)StartMaxSpeed != ival) {
-      StartMaxSpeed = ival;
-      SetToRegistry(szRegistryStartMaxSpeed,StartMaxSpeed);
+    if ((int)settings_task.StartMaxSpeed != ival) {
+      settings_task.StartMaxSpeed = ival;
+      SetToRegistry(szRegistryStartMaxSpeed,settings_task.StartMaxSpeed);
       changed = true;
     }
   }
@@ -204,6 +203,9 @@ bool dlgTaskRules(void){
   delete wf;
 
   if (changed) {
+    
+    task.setSettings(settings_task);
+
     Profile::StoreRegistry();
 
     MessageBoxX (

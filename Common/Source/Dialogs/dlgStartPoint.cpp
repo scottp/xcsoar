@@ -35,11 +35,9 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include "Dialogs.h"
 #include "SettingsTask.hpp"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
 #include "MainWindow.hpp"
 #include "WayPointList.hpp"
@@ -108,7 +106,7 @@ static void OnStartPointListEnter(WindowControl * Sender,
     int res;
     res = dlgWayPointSelect(XCSoarInterface::Basic().Location);    
     if (res>=0) {
-      SetStartPoint(ItemIndex, res);
+      task.SetStartPoint(ItemIndex, res);
       changed = true;
     }
   }
@@ -133,7 +131,7 @@ static void OnCloseClicked(WindowControl * Sender){
 
 static void OnClearClicked(WindowControl * Sender){
   (void)Sender;
-  ClearStartPoints();
+  task.ClearStartPoints();
   changed = true;
   UpdateList();
 }
@@ -167,7 +165,7 @@ void dlgStartPointShowModal(void) {
 
   assert(wf!=NULL);
 
-  CheckStartPointInTask();
+  task.CheckStartPointInTask();
 
   wStartPointList = (WndListFrame*)wf->FindByName(TEXT("frmStartPointList"));
   assert(wStartPointList!=NULL);
@@ -187,10 +185,8 @@ void dlgStartPointShowModal(void) {
 
   // now retrieve back the properties...
   if (changed) {
-    mutexTaskData.Lock();
-    SetTaskModified();
-    RefreshTask(XCSoarInterface::SettingsComputer());
-    mutexTaskData.Unlock();
+    task.SetTaskModified();
+    task.RefreshTask(XCSoarInterface::SettingsComputer());
   };
 
   delete wf;

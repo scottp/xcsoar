@@ -35,17 +35,13 @@ Copyright_License {
 }
 */
 
-#include "Dialogs.h"
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include "Interface.hpp"
-#include <math.h>
 #include "Blackboard.hpp"
 #include "SettingsTask.hpp"
 #include "Units.hpp"
 #include "Math/Earth.hpp"
 #include "LogFile.hpp"
-#include "Dialogs/dlgTools.h"
 #include "Calculations.h"
 #include "MapWindow.h"
 #include "InfoBoxLayout.h"
@@ -57,14 +53,16 @@ Copyright_License {
 #include "WayPointList.hpp"
 #include "Components.hpp"
 
+#include <math.h>
+
 static WndForm *wf=NULL;
 static WindowControl *btnMove = NULL;
-static int ActiveTaskPointOnEntry = 0;
+static unsigned ActiveTaskPointOnEntry = 0;
 
 
 static double Range = 0;
 static double Radial = 0;
-static int target_point = 0;
+static unsigned target_point = 0;
 static bool TargetMoveMode = false;
 
 static void OnOKClicked(WindowControl * Sender){
@@ -76,34 +74,39 @@ static void OnOKClicked(WindowControl * Sender){
 
 
 static void MoveTarget(double adjust_angle) {
-  if (!AATEnabled) return;
+  if (!task.getSettings().AATEnabled) return;
   if (target_point==0) return;
-  if (!ValidTaskPoint(target_point)) return;
-  if (!ValidTaskPoint(target_point+1)) return;
-  if (target_point < ActiveTaskPoint) return;
-
-  mutexTaskData.Lock();
+  if (!task.ValidTaskPoint(target_point)) return;
+  if (!task.ValidTaskPoint(target_point+1)) return;
+  if (target_point < task.getActiveIndex()) return;
 
   GEOPOINT target_location;
   double bearing, distance;
+
+  TASK_POINT tp = task.getTaskPoint(target_point);
+
   distance = 500;
-  if(task_points[target_point].AATType == SECTOR) {
-    distance = max(task_points[target_point].AATSectorRadius/20.0,distance);
+  if (tp.AATType == AAT_SECTOR) {
+    distance = max(tp.AATSectorRadius/20.0,distance);
   } else {
-    distance = max(task_points[target_point].AATCircleRadius/20.0,distance);
+    distance = max(tp.AATCircleRadius/20.0,distance);
   }
 
-  bearing = AngleLimit360(XCSoarInterface::main_window.map.GetDisplayAngle() + adjust_angle);
-  FindLatitudeLongitude (task_stats[target_point].AATTargetLocation,
-                         bearing,
-                         distance,
+  // JMW illegal
+  bearing = AngleLimit360(XCSoarInterface::main_window.map.GetDisplayAngle() 
+                          + adjust_angle);
+
+  FindLatitudeLongitude (tp.AATTargetLocation,
+                         bearing, distance,
                          &target_location);
 
-  if (InAATTurnSector(target_location, target_point)) {
-    if (XCSoarInterface::Calculated().IsInSector && (target_point == ActiveTaskPoint)) {
+  if (task.InAATTurnSector(target_location, 
+                           target_point)) {
+    if (XCSoarInterface::Calculated().IsInSector 
+        && (target_point == task.getActiveIndex())) {
       // set range/radial for inside sector
       double course_bearing, target_bearing;
-      DistanceBearing(task_stats[target_point-1].AATTargetLocation,
+      DistanceBearing(task.getTargetLocation(target_point-1),
                       XCSoarInterface::Basic().Location,
                       NULL, &course_bearing);
 
@@ -113,61 +116,63 @@ static void MoveTarget(double adjust_angle) {
       bearing = AngleLimit180(target_bearing-course_bearing);
 
       if (fabs(bearing)<90.0) {
-        task_stats[target_point].AATTargetLocation = target_location;
+        tp.AATTargetLocation = target_location;
         Radial = bearing;
-        task_stats[target_point].AATTargetOffsetRadial = Radial;
+        tp.AATTargetOffsetRadial = Radial;
         Range =
-          FindInsideAATSectorRange(XCSoarInterface::Basic().Location,
-                                   target_point,
-                                   target_bearing,
-                                   distance);
-        task_stats[target_point].AATTargetOffsetRadius = Range;
-        SetTargetModified();
+          task.FindInsideAATSectorRange(XCSoarInterface::Basic().Location,
+                                        target_point,
+                                        target_bearing,
+                                        distance);
+        tp.AATTargetOffsetRadius = Range;
+        task.setTaskPoint(target_point, tp);
+        task.SetTargetModified();
       }
     } else {
       // OK to change it..
-      task_stats[target_point].AATTargetLocation = target_location;
+      tp.AATTargetLocation = target_location;
 
       // set range/radial for outside sector
-      DistanceBearing(way_points.get(task_points[target_point].Index).Location,
-                      task_stats[target_point].AATTargetLocation,
+      DistanceBearing(task.getTaskPointLocation(target_point),
+                      tp.AATTargetLocation,
                       &distance, &bearing);
-      bearing = AngleLimit180(bearing-task_points[target_point].Bisector);
-      if(task_points[target_point].AATType == SECTOR) {
-        Range = (fabs(distance)/task_points[target_point].AATSectorRadius)*2-1;
+      bearing = AngleLimit180(bearing-tp.Bisector);
+      if (tp.AATType == AAT_SECTOR) {
+        Range = (fabs(distance)/tp.AATSectorRadius)*2-1;
       } else {
         if (fabs(bearing)>90.0) {
           distance = -distance;
           bearing = AngleLimit180(bearing+180);
         }
-        Range = distance/task_points[target_point].AATCircleRadius;
+        Range = distance/tp.AATCircleRadius;
       }
-      task_stats[target_point].AATTargetOffsetRadius = Range;
-      task_stats[target_point].AATTargetOffsetRadial = bearing;
+      tp.AATTargetOffsetRadius = Range;
+      tp.AATTargetOffsetRadial = bearing;
       Radial = bearing;
-      SetTargetModified();
+      task.setTaskPoint(target_point, tp);
+      task.SetTargetModified();
     }
   }
-  mutexTaskData.Unlock();
 }
 
 
 static void DragTarget(const GEOPOINT target_location) {
-  if (!AATEnabled) return;
+  if (!task.getSettings().AATEnabled) return;
   if (target_point==0) return;
-  if (!ValidTaskPoint(target_point)) return;
-  if (!ValidTaskPoint(target_point+1)) return;
-  if (target_point < ActiveTaskPoint) return;
-
-  mutexTaskData.Lock();
+  if (!task.ValidTaskPoint(target_point)) return;
+  if (!task.ValidTaskPoint(target_point+1)) return;
+  if (target_point < task.getActiveIndex()) return;
 
   double distance, bearing;
+  TASK_POINT tp = task.getTaskPoint(target_point);
 
-  if (InAATTurnSector(target_location, target_point)) {
-    if (XCSoarInterface::Calculated().IsInSector && (target_point == ActiveTaskPoint)) {
+  if (task.InAATTurnSector(target_location, 
+                           target_point)) {
+    if (XCSoarInterface::Calculated().IsInSector 
+        && (target_point == task.getActiveIndex())) {
       // set range/radial for inside sector
       double course_bearing, target_bearing;
-      DistanceBearing(task_stats[target_point-1].AATTargetLocation,
+      DistanceBearing(task.getTargetLocation(target_point-1),
                       XCSoarInterface::Basic().Location,
                       NULL, &course_bearing);
 
@@ -177,42 +182,43 @@ static void DragTarget(const GEOPOINT target_location) {
       bearing = AngleLimit180(target_bearing-course_bearing);
 
       if (fabs(bearing)<90.0) {
-        task_stats[target_point].AATTargetLocation = target_location;
+        tp.AATTargetLocation = target_location;
         Radial = bearing;
-        task_stats[target_point].AATTargetOffsetRadial = Radial;
+        tp.AATTargetOffsetRadial = Radial;
         Range =
-          FindInsideAATSectorRange(XCSoarInterface::Basic().Location,
-                                   target_point,
-                                   target_bearing,
-                                   distance);
-        task_stats[target_point].AATTargetOffsetRadius = Range;
-	SetTargetModified();
+          task.FindInsideAATSectorRange(XCSoarInterface::Basic().Location,
+                                        target_point,
+                                        target_bearing,
+                                        distance);
+        tp.AATTargetOffsetRadius = Range;
+        task.setTaskPoint(target_point, tp);
+	task.SetTargetModified();
       }
     } else {
       // OK to change it..
-      task_stats[target_point].AATTargetLocation = target_location;
+      tp.AATTargetLocation = target_location;
 
       // set range/radial for outside sector
-      DistanceBearing(way_points.get(task_points[target_point].Index).Location,
-                      task_stats[target_point].AATTargetLocation,
+      DistanceBearing(task.getTaskPointLocation(target_point),
+                      tp.AATTargetLocation,
                       &distance, &bearing);
-      bearing = AngleLimit180(bearing-task_points[target_point].Bisector);
-      if(task_points[target_point].AATType == SECTOR) {
-        Range = (fabs(distance)/task_points[target_point].AATSectorRadius)*2-1;
+      bearing = AngleLimit180(bearing-tp.Bisector);
+      if (tp.AATType == AAT_SECTOR) {
+        Range = (fabs(distance)/task.getTaskPoint(target_point).AATSectorRadius)*2-1;
       } else {
         if (fabs(bearing)>90.0) {
           distance = -distance;
           bearing = AngleLimit180(bearing+180);
         }
-        Range = distance/task_points[target_point].AATCircleRadius;
+        Range = distance/tp.AATCircleRadius;
       }
-      task_stats[target_point].AATTargetOffsetRadius = Range;
-      task_stats[target_point].AATTargetOffsetRadial = bearing;
+      tp.AATTargetOffsetRadius = Range;
+      tp.AATTargetOffsetRadial = bearing;
       Radial = bearing;
-      SetTargetModified();
+      task.setTaskPoint(target_point, tp);
+      task.SetTargetModified();
     }
   }
-  mutexTaskData.Unlock();
 }
 
 
@@ -264,13 +270,13 @@ static int FormKeyDown(WindowControl * Sender, WPARAM wParam, LPARAM lParam){
 static void RefreshCalculator(void) {
   WndProperty* wp;
 
-  RefreshTask(XCSoarInterface::SettingsComputer());
+  task.RefreshTask(XCSoarInterface::SettingsComputer());
   RefreshTaskStatistics();
-  target_point = max(target_point,ActiveTaskPoint);
+  target_point = max(target_point,task.getActiveIndex());
 
-  bool nodisplay = !AATEnabled
+  bool nodisplay = !task.getSettings().AATEnabled
     || (target_point==0)
-    || !ValidTaskPoint(target_point+1);
+    || !task.ValidTaskPoint(target_point+1);
 
   if (btnMove) {
     if (nodisplay) {
@@ -303,7 +309,7 @@ static void RefreshCalculator(void) {
 
   wp = (WndProperty*)wf->FindByName(TEXT("prpAATTargetLocked"));
   if (wp) {
-    wp->GetDataField()->Set(task_stats[target_point].AATTargetLocked);
+    wp->GetDataField()->Set(task.getTaskPoint(target_point).AATTargetLocked);
     wp->RefreshDisplay();
     if (nodisplay) {
       wp->SetVisible(false);
@@ -347,8 +353,8 @@ static void RefreshCalculator(void) {
   }
   wp = (WndProperty*)wf->FindByName(TEXT("prpAATDelta"));
   if (wp) {
-    wp->GetDataField()->SetAsFloat(dd-AATTaskLength);
-    if (AATEnabled) {
+    wp->GetDataField()->SetAsFloat(dd-task.getSettings().AATTaskLength);
+    if (task.getSettings().AATEnabled) {
       wp->SetVisible(true);
     } else {
       wp->SetVisible(false);
@@ -384,10 +390,11 @@ static void RefreshCalculator(void) {
 static int OnTimerNotify(WindowControl * Sender) {
   (void)Sender;
   GEOPOINT loc;
+  // JMW illegal
   if (XCSoarInterface::main_window.map.TargetDragged(&loc.Longitude, &loc.Latitude)) {
     DragTarget(loc);
   }
-  if (isTargetModified()) {
+  if (task.isTargetModified()) {
     RefreshCalculator();
   }
   return 0;
@@ -408,25 +415,21 @@ static void OnMoveClicked(WindowControl * Sender){
 
 static void OnRangeData(DataField *Sender, DataField::DataAccessKind_t Mode) {
   double RangeNew;
-  bool updated = false;
   switch(Mode){
     case DataField::daGet:
       //      Sender->Set(Range*100.0);
     break;
     case DataField::daPut:
     case DataField::daChange:
-      mutexTaskData.Lock();
-      if (target_point>=ActiveTaskPoint) {
+      if (target_point>=task.getActiveIndex()) {
         RangeNew = Sender->GetAsFloat()/100.0;
         if (RangeNew != Range) {
-          task_stats[target_point].AATTargetOffsetRadius = RangeNew;
+          TASK_POINT tp = task.getTaskPoint(target_point);
+          tp.AATTargetOffsetRadius = RangeNew;
+          task.setTaskPoint(target_point, tp);
           Range = RangeNew;
-          updated = true;
+          task.SetTargetModified();
         }
-      }
-      mutexTaskData.Unlock();
-      if (updated) {
-	SetTargetModified();
       }
     break;
   }
@@ -443,9 +446,11 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
     break;
     case DataField::daPut:
     case DataField::daChange:
-      mutexTaskData.Lock();
-      if (target_point>=ActiveTaskPoint) {
-        if (!XCSoarInterface::Calculated().IsInSector || (target_point != ActiveTaskPoint)) {
+      TASK_POINT tp = task.getTaskPoint(target_point);
+
+      if (target_point>=task.getActiveIndex()) {
+        if (!XCSoarInterface::Calculated().IsInSector 
+            || (target_point != task.getActiveIndex())) {
           dowrap = true;
         }
         RadialNew = Sender->GetAsFloat();
@@ -454,8 +459,7 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
             RadialNew = AngleLimit180(RadialNew+180);
             // flip!
             Range = -Range;
-            task_stats[target_point].AATTargetOffsetRadius =
-              -task_stats[target_point].AATTargetOffsetRadius;
+            tp.AATTargetOffsetRadius= -tp.AATTargetOffsetRadius;
             updated = true;
           } else {
             RadialNew = max(-90,min(90,RadialNew));
@@ -463,14 +467,14 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
           }
         }
         if (RadialNew != Radial) {
-          task_stats[target_point].AATTargetOffsetRadial = RadialNew;
+          tp.AATTargetOffsetRadial = RadialNew;
           Radial = RadialNew;
           updated = true;
         }
       }
-      mutexTaskData.Unlock();
       if (updated) {
-	SetTargetModified();
+        task.setTaskPoint(target_point, tp);
+	task.SetTargetModified();
       }
     break;
   }
@@ -478,18 +482,16 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
 
 
 static void RefreshTargetPoint(void) {
-  mutexTaskData.Lock();
-  target_point = max(target_point, ActiveTaskPoint);
-  if (ValidTaskPoint(target_point)) {
+  target_point = max(target_point, task.getActiveIndex());
+  if (task.ValidTaskPoint(target_point)) {
     XCSoarInterface::SetSettingsMap().TargetPanIndex = target_point;
     XCSoarInterface::SetSettingsMap().TargetPan = true;
-    Range = task_stats[target_point].AATTargetOffsetRadius;
-    Radial = task_stats[target_point].AATTargetOffsetRadial;
+    Range = task.getTaskPoint(target_point).AATTargetOffsetRadius;
+    Radial = task.getTaskPoint(target_point).AATTargetOffsetRadial;
   } else {
     Range = 0;
     Radial = 0;
   }
-  mutexTaskData.Unlock();
   RefreshCalculator();
 }
 
@@ -501,11 +503,12 @@ static void OnLockedData(DataField *Sender, DataField::DataAccessKind_t Mode) {
     case DataField::daPut:
     case DataField::daChange:
       bool lockedthis = Sender->GetAsBoolean();
-      if (ValidTaskPoint(target_point)) {
-        if (task_stats[target_point].AATTargetLocked !=
-            lockedthis) {
-	  SetTargetModified();
-          task_stats[target_point].AATTargetLocked = lockedthis;
+      if (task.ValidTaskPoint(target_point)) {
+        TASK_POINT tp = task.getTaskPoint(target_point);
+        if (tp.AATTargetLocked != lockedthis) {
+          tp.AATTargetLocked = lockedthis;
+          task.setTaskPoint(target_point, tp);
+	  task.SetTargetModified();
         }
       }
     break;
@@ -514,14 +517,14 @@ static void OnLockedData(DataField *Sender, DataField::DataAccessKind_t Mode) {
 
 
 static void OnTaskPointData(DataField *Sender, DataField::DataAccessKind_t Mode) {
-  int old_target_point = target_point;
+  unsigned old_target_point = target_point;
   switch(Mode){
     case DataField::daGet:
     break;
     case DataField::daPut:
     case DataField::daChange:
       target_point = Sender->GetAsInteger() + ActiveTaskPointOnEntry;
-      target_point = max(target_point,ActiveTaskPoint);
+      target_point = max(target_point,task.getActiveIndex());
       if (target_point != old_target_point) {
         RefreshTargetPoint();
       }
@@ -543,10 +546,10 @@ static CallBackTableEntry_t CallBackTable[]={
 
 void dlgTarget(void) {
 
-  if (!ValidTaskPoint(ActiveTaskPoint)) {
+  if (!task.ValidTaskPoint(task.getActiveIndex())) {
     return;
   }
-  ActiveTaskPointOnEntry = ActiveTaskPoint;
+  ActiveTaskPointOnEntry = task.getActiveIndex();
 
   if (!InfoBoxLayout::landscape) {
     wf = dlgLoadFromXML(CallBackTable,
@@ -585,26 +588,20 @@ void dlgTarget(void) {
   dfe = (DataFieldEnum*)wp->GetDataField();
   TCHAR tp_label[80];
   TCHAR tp_short[21];
-  mutexTaskData.Lock();
-  if (!ValidTaskPoint(target_point)) {
+  if (!task.ValidTaskPoint(target_point)) {
     target_point = ActiveTaskPointOnEntry;
   } else {
     target_point = max(target_point, ActiveTaskPointOnEntry);
   }
-  for (int i=ActiveTaskPointOnEntry; i<MAXTASKPOINTS; i++) {
-    if (ValidTaskPoint(i)) {
-      _tcsncpy(tp_short, way_points.get(task_points[i].Index).Name, 20);
-      tp_short[20] = 0;
-      _stprintf(tp_label, TEXT("%d %s"), i, tp_short);
-      dfe->addEnumText(tp_label);
-    } else {
-      if (target_point>= i) {
-        target_point= ActiveTaskPointOnEntry;
-      }
-    }
+  target_point = max(0,min((int)target_point, task.getFinalWaypoint()));
+
+  for (unsigned i=ActiveTaskPointOnEntry; task.ValidTaskPoint(i); i++) {
+    _tcsncpy(tp_short, task.getWaypoint(i).Name, 20);
+    tp_short[20] = 0;
+    _stprintf(tp_label, TEXT("%d %s"), i, tp_short);
+    dfe->addEnumText(tp_label);
   }
-  dfe->Set(max(0,target_point-ActiveTaskPointOnEntry));
-  mutexTaskData.Unlock();
+  dfe->Set(max(0,(int)target_point-(int)ActiveTaskPointOnEntry));
   wp->RefreshDisplay();
 
   RefreshTargetPoint();

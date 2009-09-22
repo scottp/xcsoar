@@ -52,11 +52,11 @@ Copyright_License {
 
 TCHAR LastTaskFileName[MAX_PATH]= TEXT("\0");
 
-void ClearTaskFileName() {
+void Task::ClearTaskFileName() {
   LastTaskFileName[0] = _T('\0');
 }
 
-const TCHAR* getTaskFilename() {
+const TCHAR* Task::getTaskFilename() const {
   return LastTaskFileName;
 }
 
@@ -84,7 +84,7 @@ static int FindOrAddWaypoint(WAYPOINT *read_waypoint) {
 }
 
 
-static bool LoadTaskWaypoints(FILE *file) {
+bool Task::LoadTaskWaypoints(FILE *file) {
   WAYPOINT read_waypoint;
 
   int i;
@@ -108,11 +108,11 @@ static bool LoadTaskWaypoints(FILE *file) {
   return true;
 }
 
-#define  BINFILEMAGICNUMBER     0x5cf77fcf
+#define  BINFILEMAGICNUMBER     0x5c378fcf
 
 // loads a new task from scratch.
-void LoadNewTask(const TCHAR *szFileName,
-		 const SETTINGS_COMPUTER &settings_computer)
+void Task::LoadNewTask(const TCHAR *szFileName,
+                       const SETTINGS_COMPUTER &settings_computer)
 {
   TASK_POINT Temp;
   START_POINT STemp;
@@ -122,150 +122,80 @@ void LoadNewTask(const TCHAR *szFileName,
   bool TaskLoaded = false;
   unsigned magic = 0;
 
-  mutexTaskData.Lock();
-
-  ActiveTaskPoint = -1;
-  for(i=0;i<MAXTASKPOINTS;i++)
-    {
-      task_points[i].Index = -1;
-    }
+  ActiveTaskPoint = 0;
+  for(i=0;i<MAXTASKPOINTS;i++) {
+    task_points[i].Index = -1;
+  }
 
   FILE *file = _tfopen(szFileName, _T("rb"));
-  if(file != NULL)
-    {
-      if (fread(&magic, sizeof(magic), 1, file) != 1) {
-	TaskInvalid = true;
-      } else if (magic != BINFILEMAGICNUMBER) {
-	TaskInvalid = true;
-      } else {
-
-      // Defaults
-      int   old_StartLine    = StartLine;
-      int   old_SectorType   = SectorType;
-      DWORD old_SectorRadius = SectorRadius;
-      DWORD old_StartRadius  = StartRadius;
-      int   old_AutoAdvance  = AutoAdvance;
-      double old_AATTaskLength = AATTaskLength;
-      BOOL   old_AATEnabled  = AATEnabled;
-      DWORD  old_FinishRadius = FinishRadius;
-      int    old_FinishLine = FinishLine;
-      bool   old_EnableMultipleStartPoints = EnableMultipleStartPoints;
-
+  if(file != NULL) {
+    if (fread(&magic, sizeof(magic), 1, file) != 1) {
+      TaskInvalid = true;
+    } else if (magic != BINFILEMAGICNUMBER) {
+      TaskInvalid = true;
+    } else {
+      
+      SETTINGS_TASK new_settings = getSettings();
       TaskLoaded = true;
-
-      for(i=0;i<MAXTASKPOINTS;i++)
-        {
-          if (fread(&Temp, sizeof(Temp), 1, file) != 1)
-            {
-              TaskInvalid = true;
-              break;
-            }
-	  memcpy(&task_points[i],&Temp, sizeof(TASK_POINT));
-
-          if(!ValidWayPoint(Temp.Index) && (Temp.Index != -1)) {
-            // Task is only invalid here if the index is out of range
-            // of the waypoints and not equal to -1.
-            // (Because -1 indicates a null task item)
-	    WaypointInvalid = true;
-	  }
-
+      
+      for(i=0;i<MAXTASKPOINTS;i++) {
+        if (fread(&Temp, sizeof(Temp), 1, file) != 1) {
+          TaskInvalid = true;
+          break;
         }
+        memcpy(&task_points[i],&Temp, sizeof(TASK_POINT));
+        
+        if(!way_points.verify_index(Temp.Index) && (Temp.Index != -1)) {
+          // Task is only invalid here if the index is out of range
+          // of the waypoints and not equal to -1.
+          // (Because -1 indicates a null task item)
+          WaypointInvalid = true;
+        }
+      }
 
       if (!TaskInvalid) {
 
-        if (fread(&AATEnabled, sizeof(AATEnabled), 1, file) != 1) {
+        if (fread(&new_settings, sizeof(SETTINGS_TASK), 1, file) != 1) {
           TaskInvalid = true;
         }
-        if (fread(&AATTaskLength, sizeof(AATTaskLength), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-
-	// ToDo review by JW
-
-	// 20060521:sgi added additional task parameters
-        if (fread(&FinishRadius, sizeof(FinishRadius), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&FinishLine, sizeof(FinishLine), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&StartRadius, sizeof(StartRadius), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&StartLine, sizeof(StartLine), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&SectorType, sizeof(SectorType), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&SectorRadius, sizeof(SectorRadius), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-        if (fread(&AutoAdvance, sizeof(AutoAdvance), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-
-        if (fread(&EnableMultipleStartPoints,
-                  sizeof(EnableMultipleStartPoints), 1, file) != 1) {
-          TaskInvalid = true;
-        }
-
-        for(i=0;i<MAXSTARTPOINTS;i++)
-        {
+        
+        for(i=0;i<MAXSTARTPOINTS;i++) {
           if (fread(&STemp, sizeof(STemp), 1, file) != 1) {
             TaskInvalid = true;
             break;
           }
-
-          if(ValidWayPoint(STemp.Index) || (STemp.Index==-1)) {
+          
+          if(way_points.verify_index(STemp.Index) || (STemp.Index==-1)) {
             memcpy(&task_start_points[i],&STemp, sizeof(START_POINT));
           } else {
 	    WaypointInvalid = true;
 	  }
         }
-
+        
         //// search for waypoints...
         if (!TaskInvalid) {
           if (!LoadTaskWaypoints(file) && WaypointInvalid) {
-            // couldn't lookup the waypoints in the file and we know there are invalid waypoints
+            // couldn't lookup the waypoints in the file and we know
+            // there are invalid waypoints
             TaskInvalid = true;
           }
-        }
-
+        }        
       }
-
-      if (TaskInvalid) {
-        StartLine = old_StartLine;
-        SectorType = old_SectorType;
-        SectorRadius = old_SectorRadius;
-        StartRadius = old_StartRadius;
-        AutoAdvance = old_AutoAdvance;
-        AATTaskLength = old_AATTaskLength;
-        AATEnabled = old_AATEnabled;
-        FinishRadius = old_FinishRadius;
-        FinishLine = old_FinishLine;
-        EnableMultipleStartPoints = old_EnableMultipleStartPoints;
-      }
-      }
-
       fclose(file);
-
+      if (!TaskInvalid) {
+        setSettings(new_settings);
+      }
+    }
   } else {
     TaskInvalid = true;
   }
 
   if (TaskInvalid) {
     ClearTask();
-  }
-
+  } 
+  
   RefreshTask(settings_computer);
-
-  if (!ValidTaskPoint(0)) {
-    ActiveTaskPoint = 0;
-  }
-
-  mutexTaskData.Unlock();
-
+  
   if (TaskInvalid && TaskLoaded) {
     MessageBoxX(
       gettext(TEXT("Error in task file!")),
@@ -276,33 +206,17 @@ void LoadNewTask(const TCHAR *szFileName,
     SetTargetModified(false);
     _tcscpy(LastTaskFileName, szFileName);
   }
-
 }
 
 
-void SaveTask(const TCHAR *szFileName)
+void Task::SaveTask(const TCHAR *szFileName)
 {
-  mutexTaskData.Lock();
-
   FILE *file = _tfopen(szFileName, _T("wb"));
   if (file != NULL) {
     unsigned magic = BINFILEMAGICNUMBER;
     fwrite(&magic, sizeof(magic), 1, file);
     fwrite(&task_points[0], sizeof(task_points[0]), MAXTASKPOINTS, file);
-    fwrite(&AATEnabled, sizeof(AATEnabled), 1, file);
-    fwrite(&AATTaskLength, sizeof(AATTaskLength), 1, file);
-
-    // 20060521:sgi added additional task parameters
-    fwrite(&FinishRadius, sizeof(FinishRadius), 1, file);
-    fwrite(&FinishLine, sizeof(FinishLine), 1, file);
-    fwrite(&StartRadius, sizeof(StartRadius), 1, file);
-    fwrite(&StartLine, sizeof(StartLine), 1, file);
-    fwrite(&SectorType, sizeof(SectorType), 1, file);
-    fwrite(&SectorRadius, sizeof(SectorRadius), 1, file);
-    fwrite(&AutoAdvance, sizeof(AutoAdvance), 1, file);
-
-    fwrite(&EnableMultipleStartPoints,
-           sizeof(EnableMultipleStartPoints), 1, file);
+    fwrite(&getSettings(), sizeof(SETTINGS_TASK), 1, file);
     fwrite(&task_start_points[0], sizeof(task_start_points[0]), MAXSTARTPOINTS, file);
 
     // JMW added writing of waypoint data, in case it's missing
@@ -325,8 +239,8 @@ void SaveTask(const TCHAR *szFileName)
     }
 
     fclose(file);
-    SetTaskModified(false); // task successfully saved
-    SetTargetModified(false);
+//    SetTaskModified(false); // task successfully saved
+//    SetTargetModified(false);
     _tcscpy(LastTaskFileName, szFileName);
 
   } else {
@@ -336,12 +250,10 @@ void SaveTask(const TCHAR *szFileName)
                 gettext(TEXT("Save task")),
                 MB_OK|MB_ICONEXCLAMATION);
   }
-  mutexTaskData.Unlock();
 }
 
 
-void SaveDefaultTask(void) {
-  mutexTaskData.Lock();
+void Task::SaveDefaultTask(void) {
   if (!isTaskAborted()) {
     TCHAR buffer[MAX_PATH];
 #ifdef GNAV
@@ -351,7 +263,4 @@ void SaveDefaultTask(void) {
 #endif
     SaveTask(buffer);
   }
-  mutexTaskData.Unlock();
 }
-
-

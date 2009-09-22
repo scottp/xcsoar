@@ -35,13 +35,27 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Units.hpp"
-#include "Waypointparser.h"
-#include "Dialogs/dlgTools.h"
-//#include "LocalTime.hpp"
+#ifndef XCSOAR_SCREEN_TIMER_HXX
+#define XCSOAR_SCREEN_TIMER_HXX
 
-void dlgStatusTaskShowModal(void){
+#ifndef ENABLE_SDL
+#error This header is SDL-only
+#endif
 
-}
+#include <SDL/SDL.h>
 
+class Window;
+
+class SDLTimer {
+  Window &window;
+  SDL_TimerID id;
+
+public:
+  SDLTimer(Window &window, unsigned ms);
+  ~SDLTimer();
+
+protected:
+  static Uint32 callback(Uint32 interval, void *param);
+};
+
+#endif

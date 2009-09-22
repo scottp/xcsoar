@@ -42,24 +42,6 @@ Copyright_License {
 #include "Thread/Mutex.hpp"
 
 extern Mutex mutexBlackboard;
-extern Mutex mutexComm;
-extern Mutex mutexTaskData;
-
-class TerrainDataClient {
-protected:
-  void Lock() {
-    mutexTerrainData.Lock();
-  }
-  void Unlock() {
-    mutexTerrainData.Unlock();
-  }
-  Mutex* GetMutex() {
-    return &mutexTerrainData;
-  }
-private:
-  static Mutex mutexTerrainData;
-};
-
 
 void TriggerGPSUpdate();
 void TriggerVarioUpdate();

@@ -43,9 +43,10 @@ Copyright_License {
 #include "ReplayLogger.hpp"
 #include "MainWindow.hpp"
 #include "Interface.hpp"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "SettingsTask.hpp"
+#include "Components.hpp"
+#include "WayPointList.hpp"
 #include "Compatibility/string.h"
 #include "InfoBoxManager.h"
 #include "SettingsUser.hpp"
@@ -85,11 +86,11 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
 
   if (_tcsstr(OutBuffer, TEXT("$(")) == NULL) return false;
 
-  if (isTaskAborted()) {
+  if (task.isTaskAborted()) {
     if (_tcsstr(OutBuffer, TEXT("$(WaypointNext)"))) {
       // Waypoint\nNext
-      invalid = !ValidTaskPoint(ActiveTaskPoint+1);
-      CondReplaceInString(!ValidTaskPoint(ActiveTaskPoint+2),
+      invalid = !task.ValidTaskPoint(task.getActiveIndex()+1);
+      CondReplaceInString(!task.ValidTaskPoint(task.getActiveIndex()+2),
                           OutBuffer,
                           TEXT("$(WaypointNext)"),
                           TEXT("Landpoint\nFurthest"),
@@ -98,8 +99,8 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
     } else
     if (_tcsstr(OutBuffer, TEXT("$(WaypointPrevious)"))) {
       // Waypoint\nNext
-      invalid = !ValidTaskPoint(ActiveTaskPoint-1);
-      CondReplaceInString(!ValidTaskPoint(ActiveTaskPoint-2),
+      invalid = !task.ValidTaskPoint(task.getActiveIndex()-1);
+      CondReplaceInString(!task.ValidTaskPoint(task.getActiveIndex()-2),
                           OutBuffer,
                           TEXT("$(WaypointPrevious)"),
                           TEXT("Landpoint\nClosest"),
@@ -108,8 +109,8 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
   } else {
     if (_tcsstr(OutBuffer, TEXT("$(WaypointNext)"))) {
       // Waypoint\nNext
-      invalid = !ValidTaskPoint(ActiveTaskPoint+1);
-      CondReplaceInString(!ValidTaskPoint(ActiveTaskPoint+2),
+      invalid = !task.ValidTaskPoint(task.getActiveIndex()+1);
+      CondReplaceInString(!task.ValidTaskPoint(task.getActiveIndex()+2),
                           OutBuffer,
                           TEXT("$(WaypointNext)"),
                           TEXT("Waypoint\nFinish"),
@@ -117,25 +118,25 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
 
     } else
     if (_tcsstr(OutBuffer, TEXT("$(WaypointPrevious)"))) {
-      if (ActiveTaskPoint==1) {
-        invalid = !ValidTaskPoint(ActiveTaskPoint-1);
+      if (task.getActiveIndex()==1) {
+        invalid = !task.ValidTaskPoint(task.getActiveIndex()-1);
         ReplaceInString(OutBuffer, TEXT("$(WaypointPrevious)"),
                         TEXT("Waypoint\nStart"), Size);
-      } else if (EnableMultipleStartPoints) {
-        invalid = !ValidTaskPoint(0);
-        CondReplaceInString((ActiveTaskPoint==0),
+      } else if (task.getSettings().EnableMultipleStartPoints) {
+        invalid = !task.ValidTaskPoint(0);
+        CondReplaceInString((task.getActiveIndex()==0),
                             OutBuffer,
                             TEXT("$(WaypointPrevious)"),
                             TEXT("StartPoint\nCycle"), TEXT("Waypoint\nPrevious"), Size);
       } else {
-        invalid = (ActiveTaskPoint<=0);
+        invalid = (task.getActiveIndex()<=0);
         ReplaceInString(OutBuffer, TEXT("$(WaypointPrevious)"), TEXT("Waypoint\nPrevious"), Size);
       }
     }
   }
 
   if (_tcsstr(OutBuffer, TEXT("$(AdvanceArmed)"))) {
-    switch (AutoAdvance) {
+    switch (task.getSettings().AutoAdvance) {
     case 0:
       ReplaceInString(OutBuffer, TEXT("$(AdvanceArmed)"), TEXT("(manual)"), Size);
       invalid = true;
@@ -145,9 +146,9 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
       invalid = true;
       break;
     case 2:
-      if (ActiveTaskPoint>0) {
-        if (ValidTaskPoint(ActiveTaskPoint+1)) {
-          CondReplaceInString(AdvanceArmed, OutBuffer, TEXT("$(AdvanceArmed)"),
+      if (task.getActiveIndex()>0) {
+        if (task.ValidTaskPoint(task.getActiveIndex()+1)) {
+          CondReplaceInString(task.isAdvanceArmed(), OutBuffer, TEXT("$(AdvanceArmed)"),
                               TEXT("Cancel"), TEXT("TURN"), Size);
         } else {
           ReplaceInString(OutBuffer, TEXT("$(AdvanceArmed)"),
@@ -155,16 +156,16 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
           invalid = true;
         }
       } else {
-        CondReplaceInString(AdvanceArmed, OutBuffer, TEXT("$(AdvanceArmed)"),
+        CondReplaceInString(task.isAdvanceArmed(), OutBuffer, TEXT("$(AdvanceArmed)"),
                             TEXT("Cancel"), TEXT("START"), Size);
       }
       break;
     case 3:
-      if (ActiveTaskPoint==0) {
-        CondReplaceInString(AdvanceArmed, OutBuffer, TEXT("$(AdvanceArmed)"),
+      if (task.getActiveIndex()==0) {
+        CondReplaceInString(task.isAdvanceArmed(), OutBuffer, TEXT("$(AdvanceArmed)"),
                             TEXT("Cancel"), TEXT("START"), Size);
-      } else if (ActiveTaskPoint==1) {
-        CondReplaceInString(AdvanceArmed, OutBuffer, TEXT("$(AdvanceArmed)"),
+      } else if (task.getActiveIndex()==1) {
+        CondReplaceInString(task.isAdvanceArmed(), OutBuffer, TEXT("$(AdvanceArmed)"),
                             TEXT("Cancel"), TEXT("RESTART"), Size);
       } else {
         ReplaceInString(OutBuffer, TEXT("$(AdvanceArmed)"), TEXT("(auto)"), Size);
@@ -184,7 +185,7 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
   }
 
   if (_tcsstr(OutBuffer, TEXT("$(CheckWaypointFile)"))) {
-    if (!ValidWayPoint(0)) {
+    if (!way_points.verify_index(0)) {
       invalid = true;
     }
     ReplaceInString(OutBuffer, TEXT("$(CheckWaypointFile)"), TEXT(""), Size);
@@ -198,14 +199,14 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
     ReplaceInString(OutBuffer, TEXT("$(CheckSettingsLockout)"), TEXT(""), Size);
   }
   if (_tcsstr(OutBuffer, TEXT("$(CheckTaskResumed)"))) {
-    if (isTaskAborted()) {
+    if (task.isTaskAborted()) {
       // TODO code: check, does this need to be set with temporary task?
       invalid = true;
     }
     ReplaceInString(OutBuffer, TEXT("$(CheckTaskResumed)"), TEXT(""), Size);
   }
   if (_tcsstr(OutBuffer, TEXT("$(CheckTask)"))) {
-    if (!ValidTask()) {
+    if (!task.Valid()) {
       invalid = true;
     }
     ReplaceInString(OutBuffer, TEXT("$(CheckTask)"), TEXT(""), Size);
@@ -229,7 +230,7 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
     ReplaceInString(OutBuffer, TEXT("$(CheckTerrain)"), TEXT(""), Size);
   }
   if (_tcsstr(OutBuffer, TEXT("$(CheckAutoMc)"))) {
-    if (!ValidTask()
+    if (!task.Valid()
         && ((SettingsComputer().AutoMcMode==0)
 	    || (SettingsComputer().AutoMcMode==2))) {
       invalid = true;
@@ -237,7 +238,8 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
     ReplaceInString(OutBuffer, TEXT("$(CheckAutoMc)"), TEXT(""), Size);
   }
 
-  CondReplaceInString(isLoggerActive(), OutBuffer, TEXT("$(LoggerActive)"), TEXT("Stop"), TEXT("Start"), Size);
+  CondReplaceInString(logger.isLoggerActive(), OutBuffer, 
+                      TEXT("$(LoggerActive)"), TEXT("Stop"), TEXT("Start"), Size);
 
   if (_tcsstr(OutBuffer, TEXT("$(SnailTrailToggleName)"))) {
     switch(SettingsMap().TrailActive) {
@@ -312,19 +314,9 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
 
   //////
 
-  CondReplaceInString(TaskIsTemporary(),
+  CondReplaceInString(task.TaskIsTemporary(),
 		      OutBuffer, TEXT("$(TaskAbortToggleActionName)"),
 		      TEXT("Resume"), TEXT("Abort"), Size);
-
-  if (_tcsstr(OutBuffer, TEXT("$(FinalForceToggleActionName)"))) {
-    CondReplaceInString(ForceFinalGlide, OutBuffer,
-                        TEXT("$(FinalForceToggleActionName)"),
-                        TEXT("Unforce"),
-                        TEXT("Force"), Size);
-    if (SettingsComputer().AutoForceFinalGlide) {
-      invalid = true;
-    }
-  }
 
   CondReplaceInString(SettingsMap().FullScreen, OutBuffer,
                       TEXT("$(FullScreenToggleActionName)"),
@@ -360,11 +352,11 @@ bool ButtonLabel::ExpandMacros(const TCHAR *In,
   CondReplaceInString(SettingsMap().UserForceDisplayMode == dmNone, OutBuffer, TEXT("$(DispModeAutoShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
   CondReplaceInString(SettingsMap().UserForceDisplayMode == dmFinalGlide, OutBuffer, TEXT("$(DispModeFinalShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
 
-  CondReplaceInString(AltitudeMode == ALLON, OutBuffer, TEXT("$(AirspaceModeAllShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
-  CondReplaceInString(AltitudeMode == CLIP,  OutBuffer, TEXT("$(AirspaceModeClipShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
-  CondReplaceInString(AltitudeMode == AUTO,  OutBuffer, TEXT("$(AirspaceModeAutoShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
-  CondReplaceInString(AltitudeMode == ALLBELOW, OutBuffer, TEXT("$(AirspaceModeBelowShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
-  CondReplaceInString(AltitudeMode == ALLOFF, OutBuffer, TEXT("$(AirspaceModeAllOffIndicator)"), TEXT("(*)"), TEXT(""), Size);
+  CondReplaceInString(SettingsComputer().AltitudeMode == ALLON, OutBuffer, TEXT("$(AirspaceModeAllShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
+  CondReplaceInString(SettingsComputer().AltitudeMode == CLIP,  OutBuffer, TEXT("$(AirspaceModeClipShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
+  CondReplaceInString(SettingsComputer().AltitudeMode == AUTO,  OutBuffer, TEXT("$(AirspaceModeAutoShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
+  CondReplaceInString(SettingsComputer().AltitudeMode == ALLBELOW, OutBuffer, TEXT("$(AirspaceModeBelowShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
+  CondReplaceInString(SettingsComputer().AltitudeMode == ALLOFF, OutBuffer, TEXT("$(AirspaceModeAllOffIndicator)"), TEXT("(*)"), TEXT(""), Size);
 
   CondReplaceInString(SettingsMap().TrailActive == 0, OutBuffer, TEXT("$(SnailTrailOffShortIndicator)"), TEXT("(*)"), TEXT(""), Size);
   CondReplaceInString(SettingsMap().TrailActive == 2, OutBuffer, TEXT("$(SnailTrailShortShortIndicator)"), TEXT("(*)"), TEXT(""), Size);

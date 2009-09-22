@@ -105,7 +105,6 @@ class WindowControl : public ContainerWindow {
     Brush mhBrushBk;
     Pen mhPenBorder;
     Pen mhPenSelector;
-    RECT mBoundRect;
     const Font *mhFont;
     TCHAR mName[64];
     TCHAR *mHelpText;
@@ -143,8 +142,10 @@ class WindowControl : public ContainerWindow {
   public:
     TCHAR* GetCaption(void) { return mCaption; };
 
+#ifndef ENABLE_SDL
     virtual LRESULT on_message(HWND hWnd, UINT message,
                                WPARAM wParam, LPARAM lParam);
+#endif /* !ENABLE_SDL */
 
     virtual void AddClient(WindowControl *Client);
 
@@ -171,8 +172,6 @@ class WindowControl : public ContainerWindow {
     void SetOnHelpCallback(void(*Function)(WindowControl * Sender)){
       mOnHelpCallback = Function;
     }
-
-    RECT *GetBoundRect(void){return(&mBoundRect);};
 
     int GetWidth(void){return(mWidth);};
     int GetHeight(void){return(mHeight);};
@@ -223,7 +222,10 @@ class WindowControl : public ContainerWindow {
     virtual void SetCaption(const TCHAR *Value);
     void SetHelpText(const TCHAR *Value);
 
+#ifndef ENABLE_SDL
     HWND GetHandle(void) { return *this; }
+#endif /* !ENABLE_SDL */
+
     virtual ContainerWindow &GetClientAreaWindow(void) { return *this; }
     Canvas &GetCanvas(void) { return get_canvas(); }
     WindowControl *GetOwner(void){return(mOwner);};
@@ -533,8 +535,10 @@ class WndProperty:public WindowControl{
     virtual bool on_mouse_down(int x, int y);
     virtual bool on_key_down(unsigned key_code);
     virtual bool on_key_up(unsigned key_code);
+#ifndef ENABLE_SDL
     virtual LRESULT on_message(HWND hWnd, UINT message,
                                WPARAM wParam, LPARAM lParam);
+#endif /* !ENABLE_SDL */
   };
 
   private:

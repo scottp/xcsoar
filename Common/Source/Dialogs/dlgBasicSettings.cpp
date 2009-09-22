@@ -35,17 +35,14 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
+#include "Dialogs/Internal.hpp"
 #include "Protection.hpp"
-#include "Interface.hpp"
 #include "Math/Pressure.h"
 #include "Blackboard.hpp"
-#include "Settings.hpp"
 #include "SettingsComputer.hpp"
 #include "Units.hpp"
 #include "McReady.h"
 #include "Atmosphere.h"
-#include "Dialogs/dlgTools.h"
 #include "Device/device.h"
 #include "DataField/Base.hpp"
 #include "Airspace.h"

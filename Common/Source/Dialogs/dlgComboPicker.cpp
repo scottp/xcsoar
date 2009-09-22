@@ -35,16 +35,11 @@ Copyright_License {
 }
 */
 
-#include "XCSoar.h"
-#include "Interface.hpp"
+#include "Dialogs/Internal.hpp"
 #include "Units.hpp"
 #include "Device/device.h"
 #include "InputEvents.h"
-#include "WindowControls.h"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
-#include "Screen/Util.hpp"
-#include "MainWindow.hpp"
 #include "DataField/Base.hpp"
 #include "DataField/ComboList.hpp"
 
@@ -141,14 +136,9 @@ static CallBackTableEntry_t CallBackTable[]={
   DeclareCallBackEntry(NULL)
 };
 
-
-
-
-
-
-
-int dlgComboPicker(WndProperty* theProperty){
-
+int
+dlgComboPicker(ContainerWindow &parent, WndProperty *theProperty)
+{
   static bool bInComboPicker=false;
   bool bInitialPage=true;
   bool bOpenCombo=true; // used to exit loop (optionally reruns combo with
@@ -168,12 +158,12 @@ int dlgComboPicker(WndProperty* theProperty){
     if (!InfoBoxLayout::landscape) {
       wf = dlgLoadFromXML(CallBackTable,
                           TEXT("dlgComboPicker_L.xml"),
-                          XCSoarInterface::main_window,
+                          parent,
                           TEXT("IDR_XML_COMBOPICKER_L"));
     } else {
       wf = dlgLoadFromXML(CallBackTable,
                           TEXT("dlgWayComboPicker.xml"),
-                          XCSoarInterface::main_window,
+                          parent,
                           TEXT("IDR_XML_COMBOPICKER"));
     }
 
@@ -193,7 +183,11 @@ int dlgComboPicker(WndProperty* theProperty){
     wComboPopupListEntry = (WndOwnerDrawFrame*)wf->FindByName(TEXT("frmComboPopupListEntry"));
     assert(wComboPopupListEntry!=NULL);
     wComboPopupListEntry->SetCanFocus(true);
+#ifdef ENABLE_SDL
+    wComboPopupListEntry->set_focus(); // XXX
+#else /* !ENABLE_SDL */
     wComboPopupListEntry->SetFocused(true, wComboPopupWndProperty->GetHandle());
+#endif /* !ENABLE_SDL */
 
 
     ComboPopupDataField = wComboPopupWndProperty->GetDataField();

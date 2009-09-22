@@ -54,7 +54,6 @@ Copyright_License {
 #include "Message.h"
 #include "Language.hpp"
 #include "Task.h"
-#include "TaskFile.hpp"
 #include "Protection.hpp"
 #include "LogFile.hpp"
 #include "Math/FastMath.h"
@@ -97,6 +96,7 @@ GlideComputer glide_computer;
 DrawThread *draw_thread;
 CalculationThread *calculation_thread;
 InstrumentThread *instrument_thread;
+Logger logger; // global
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -161,7 +161,7 @@ void XCSoarInterface::AfterStartup() {
 
   // Create default task if none exists
   StartupStore(TEXT("Create default task\n"));
-  DefaultTask(SettingsComputer());
+  task.DefaultTask(SettingsComputer());
 
   StartupStore(TEXT("CloseProgressDialog\n"));
   CloseProgressDialog();
@@ -283,9 +283,9 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
 
   // Initialise main blackboard data
 
-  ClearTask();
+  task.ClearTask();
   glide_computer.Initialise();
-  LinkGRecordDLL(); // try to link DLL if it exists
+  logger.LinkGRecordDLL(); // try to link DLL if it exists
   OpenGeoid();
 
   PreloadInitialisation(false);
@@ -387,7 +387,7 @@ void XCSoarInterface::Shutdown(void) {
 
   CreateProgressDialog(gettext(TEXT("Shutdown, saving logs...")));
   // stop logger
-  guiStopLogger(Basic(),true);
+  logger.guiStopLogger(Basic(),true);
 
   CreateProgressDialog(gettext(TEXT("Shutdown, saving profile...")));
   // Save settings
@@ -406,28 +406,30 @@ void XCSoarInterface::Shutdown(void) {
   // Stop drawing
   CreateProgressDialog(gettext(TEXT("Shutdown, please wait...")));
 
-  // Stop calculating too (wake up)
-  TriggerAll();
-
   StartupStore(TEXT("CloseDrawingThread\n"));
   closeTriggerEvent.trigger();
-  drawTriggerEvent.trigger(); // wake self up
-  draw_thread->suspend();
+
+  calculation_thread->join();
+  StartupStore(TEXT("- calculation thread returned\n"));
+
+  instrument_thread->join();
+  StartupStore(TEXT("- instrument thread returned\n"));
+
   draw_thread->join();
+  StartupStore(TEXT("- draw thread returned\n"));
+
   delete draw_thread;
 
   // Clear data
 
   CreateProgressDialog(gettext(TEXT("Shutdown, saving task...")));
+  StartupStore(TEXT("Resume abort task\n"));
+  task.ResumeAbortTask(SettingsComputer(), -1); // turn off abort if it was on.
   StartupStore(TEXT("Save default task\n"));
-  mutexTaskData.Lock();
-  ResumeAbortTask(SettingsComputer(), -1); // turn off abort if it was on.
-  mutexTaskData.Unlock();
-  SaveDefaultTask();
-
+  task.SaveDefaultTask();
   StartupStore(TEXT("Clear task data\n"));
-
-  ClearTask();
+  task.ClearTask();
+  StartupStore(TEXT("Close airspace\n"));
   CloseAirspace();
 
   StartupStore(TEXT("Close waypoints\n"));
@@ -439,7 +441,6 @@ void XCSoarInterface::Shutdown(void) {
 
   RASP.Close();
   terrain.CloseTerrain();
-  topology->Close();
 
   delete topology;
   delete marks;

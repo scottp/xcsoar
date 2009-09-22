@@ -35,15 +35,12 @@ Copyright_License {
 }
 */
 
+#include "Dialogs/Internal.hpp"
 #include "XCSoar.h"
-#include "Dialogs.h"
 #include "Message.h"
-#include "Language.hpp"
-#include "Dialogs/dlgTools.h"
 #include "InfoBoxLayout.h"
 #include "Registry.hpp"
 #include "UtilsProfile.hpp"
-#include "Screen/Util.hpp"
 #include "Screen/Graphics.hpp"
 #include "MainWindow.hpp"
 #include "SettingsAirspace.hpp"
@@ -136,9 +133,11 @@ OnAirspacePaintListItem(WindowControl *Sender, Canvas &canvas)
     if (colormode) {
 
       canvas.white_pen();
-      canvas.set_text_color(MapGfx.GetAirspaceColourByClass(i));
+      canvas.set_text_color(MapGfx.GetAirspaceColourByClass(i,
+                              XCSoarInterface::SettingsMap()));
       canvas.set_background_color(Color(0xFF, 0xFF, 0xFF));
-      canvas.select(MapGfx.GetAirspaceBrushByClass(i));
+      canvas.select(MapGfx.GetAirspaceBrushByClass(i,
+                      XCSoarInterface::SettingsMap()));
       canvas.rectangle(x0, 2 * InfoBoxLayout::scale,
                        w0, 22 * InfoBoxLayout::scale);
 
@@ -147,8 +146,8 @@ OnAirspacePaintListItem(WindowControl *Sender, Canvas &canvas)
       bool iswarn;
       bool isdisplay;
 
-      iswarn = (iAirspaceMode[i]>=2);
-      isdisplay = ((iAirspaceMode[i]%2)>0);
+      iswarn = (XCSoarInterface::SettingsComputer().iAirspaceMode[i]>=2);
+      isdisplay = ((XCSoarInterface::SettingsComputer().iAirspaceMode[i]%2)>0);
       if (iswarn) {
         _tcscpy(label, gettext(TEXT("Warn")));
         canvas.text_opaque(w0-w1-w2, 2*InfoBoxLayout::scale, label);
@@ -178,21 +177,23 @@ static void OnAirspaceListEnter(WindowControl * Sender,
     if (colormode) {
       int c = dlgAirspaceColoursShowModal();
       if (c>=0) {
-	iAirspaceColour[ItemIndex] = c;
-	SetRegistryColour(ItemIndex,iAirspaceColour[ItemIndex]);
+	XCSoarInterface::SetSettingsMap().iAirspaceColour[ItemIndex] = c;
+	SetRegistryColour(ItemIndex,
+                          XCSoarInterface::SettingsMap().iAirspaceColour[ItemIndex]);
 	changed = true;
       }
       int p = dlgAirspacePatternsShowModal();
       if (p>=0) {
-	iAirspaceBrush[ItemIndex] = p;
-	SetRegistryBrush(ItemIndex,iAirspaceBrush[ItemIndex]);
+	XCSoarInterface::SetSettingsMap().iAirspaceBrush[ItemIndex] = p;
+	SetRegistryBrush(ItemIndex,
+                         XCSoarInterface::SettingsMap().iAirspaceBrush[ItemIndex]);
 	changed = true;
       }
     } else {
-      int v = (iAirspaceMode[ItemIndex]+1)%4;
-      iAirspaceMode[ItemIndex] = v;
+      int v = (XCSoarInterface::SettingsComputer().iAirspaceMode[ItemIndex]+1)%4;
+      XCSoarInterface::SetSettingsComputer().iAirspaceMode[ItemIndex] = v;
       //  wAirspaceList->Redraw();
-      SetRegistryAirspaceMode(ItemIndex);
+      Profile::SetRegistryAirspaceMode(ItemIndex);
       changed = true;
     }
   }

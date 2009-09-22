@@ -88,7 +88,10 @@ void LoadCalculationsPersist(DERIVED_INFO *Calculated) {
     }
 
     fread(Calculated, sizeof(*Calculated), 1, file);
-
+    Calculated->Flying = false;
+    Calculated->TimeInFlight = 0;
+    Calculated->TimeOnGround = 60;
+    
     fread(&sizein, sizeof(sizein), 1, file);
     if (sizein != sizeof(glide_computer.GetFlightStats())) {
 
@@ -151,10 +154,10 @@ void SaveCalculationsPersist(const NMEA_INFO &gps_info,
 			     const DERIVED_INFO &Calculated) {
   DWORD size;
 
-  LoggerClearFreeSpace(gps_info);
+  logger.LoggerClearFreeSpace(gps_info);
 
   if (FindFreeSpace(szCalculationsPersistDirectory)<MINFREESTORAGE) {
-    if (!LoggerClearFreeSpace(gps_info)) {
+    if (!logger.LoggerClearFreeSpace(gps_info)) {
       StartupStore(TEXT("SaveCalculationsPersist insufficient storage\n"));
       return;
     } else {
