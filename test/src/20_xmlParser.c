@@ -8,7 +8,7 @@
 #include <stdlib.h>   // to get "free" function
 #include "xmlParser.h"
 
-int main(int argc, char **argv)
+int WinMain(int argc, char **argv)
 {
   // this open and parse the XML file:
   XMLNode xMainNode=XMLNode::openFileHelper("test.xml","PMML");
