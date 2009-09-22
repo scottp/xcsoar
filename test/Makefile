@@ -39,15 +39,7 @@ include $(topdir)/build/sdl.mk
 BUILDTESTS=\
 	t/01_test_tap.exe
 
-<<<<<<< HEAD:test/Makefile
-# NOTE: For now this is hard coded, but should take it or called from main Makefile
-SRC=../Common/Source
-HDR=../Common/Header
-INCLUDES        := -I$(HDR)/mingw32compat -I$(HDR) -I$(SRC)
-CPPFLAGS        := $(INCLUDES)
-=======
 all: $(BUILDTESTS) RunWayPointParser-$(TARGET)$(TARGET_EXEEXT)
->>>>>>> 8bba777c0859dfba80203ab83c08f5da33819f49:test/Makefile
 
 test: .phony $(BUILDTESTS)
 	# prove
