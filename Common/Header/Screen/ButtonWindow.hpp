@@ -35,58 +35,21 @@ Copyright_License {
 }
 */
 
-#ifndef XCSOAR_MAIN_WINDOW_HXX
-#define XCSOAR_MAIN_WINDOW_HXX
+#ifndef XCSOAR_SCREEN_BUTTON_WINDOW_HXX
+#define XCSOAR_SCREEN_BUTTON_WINDOW_HXX
 
-#include "Screen/TopWindow.hpp"
-#include "MapWindow.h"
-#include "PopupMessage.hpp"
-
-class GaugeVario;
-class GaugeFLARM;
-class StatusMessageList;
+#include "Screen/Window.hpp"
 
 /**
- * The XCSoar main window.
+ * A clickable button.
  */
-class MainWindow : public TopWindow {
+class ButtonWindow : public Window {
 public:
-  MapWindow map;
-  GaugeVario *vario;
-  GaugeFLARM *flarm;
-  PopupMessage popup;
-
-private:
-  timer_t timer_id;
-
-public:
-  MainWindow(const StatusMessageList &status_messages)
-    :vario(NULL), flarm(NULL), popup(status_messages, *this) {}
-  virtual ~MainWindow();
-
-  static bool find(LPCTSTR text) {
-    return TopWindow::find(_T("XCSoarMain"), text);
+  void set(ContainerWindow &parent, const TCHAR *text,
+           int left, int top, unsigned width, unsigned height) {
+    Window::set(&parent, _T("BUTTON"), text,
+                left, top, width, height);
   }
-
-  static bool register_class(HINSTANCE hInstance);
-
-  void set(LPCTSTR text,
-           int left, int top, unsigned width, unsigned height);
-
-  void reset() {
-    map.reset();
-    TopWindow::reset();
-  }
-
-protected:
-  virtual Brush *on_color(Window &window, Canvas &canvas);
-  bool on_activate();
-  bool on_timer(timer_t id);
-  bool on_create();
-  bool on_destroy();
-  bool on_close();
-public:
-  void install_timer();
 };
 
 #endif
