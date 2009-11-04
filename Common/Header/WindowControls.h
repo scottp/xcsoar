@@ -142,6 +142,9 @@ class WindowControl : public ContainerWindow {
   public:
     TCHAR* GetCaption(void) { return mCaption; };
 
+    virtual bool on_setfocus();
+    virtual bool on_killfocus();
+
 #ifndef ENABLE_SDL
     virtual LRESULT on_message(HWND hWnd, UINT message,
                                WPARAM wParam, LPARAM lParam);
@@ -176,7 +179,7 @@ class WindowControl : public ContainerWindow {
     int GetWidth(void){return(mWidth);};
     int GetHeight(void){return(mHeight);};
 
-    virtual bool SetFocused(bool Value, HWND FromTo);
+    bool SetFocused(bool Value);
     bool GetFocused(void);
     WindowControl *GetCanFocus(void);
     bool SetCanFocus(bool Value);
@@ -184,7 +187,7 @@ class WindowControl : public ContainerWindow {
     bool GetReadOnly(void){return(mReadOnly);};
     bool SetReadOnly(bool Value);
 
-    bool SetVisible(bool Value);
+    void SetVisible(bool Value);
     bool GetVisible(void);
 
     int  GetBorderKind(void);
@@ -443,9 +446,6 @@ class WndForm:public WindowControl{
     ContainerWindow &GetClientAreaWindow(void);
     void AddClient(WindowControl *Client);
 
-    virtual bool SetFocused(bool Value, HWND FromTo);
-
-
     int OnLButtonUp(WPARAM wParam, LPARAM lParam){
 		(void)wParam; (void)lParam;
       return(0);
@@ -470,7 +470,7 @@ class WndForm:public WindowControl{
     void SetCaption(const TCHAR *Value);
 
     /** from class Window */
-    virtual bool on_command(HWND hWnd, unsigned id, unsigned code);
+    virtual bool on_command(unsigned id, unsigned code);
     virtual bool on_timer(timer_t id);
     virtual bool on_user(unsigned id);
 
@@ -535,10 +535,8 @@ class WndProperty:public WindowControl{
     virtual bool on_mouse_down(int x, int y);
     virtual bool on_key_down(unsigned key_code);
     virtual bool on_key_up(unsigned key_code);
-#ifndef ENABLE_SDL
-    virtual LRESULT on_message(HWND hWnd, UINT message,
-                               WPARAM wParam, LPARAM lParam);
-#endif /* !ENABLE_SDL */
+    virtual bool on_setfocus();
+    virtual bool on_killfocus();
   };
 
   private:
@@ -585,7 +583,11 @@ class WndProperty:public WindowControl{
     ~WndProperty(void);
     virtual void Destroy(void);
 
-    bool SetFocused(bool Value, HWND FromTo);
+    virtual bool on_setfocus();
+    virtual bool on_killfocus();
+
+    void on_editor_setfocus();
+    void on_editor_killfocus();
 
     bool SetReadOnly(bool Value);
 

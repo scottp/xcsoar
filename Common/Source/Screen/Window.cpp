@@ -57,11 +57,19 @@ Window::set(ContainerWindow *parent, LPCTSTR cls, LPCTSTR text,
   this->left = left;
   this->top = top;
   canvas.set(width, height);
+
+  if (parent != NULL)
+    parent->add_child(*this);
 #else /* !ENABLE_SDL */
   hWnd = ::CreateWindowEx(ex_style, cls, text, style,
                           left, top, width, height,
                           parent != NULL ? parent->hWnd : NULL,
                           NULL, XCSoarInterface::hInst, this);
+
+  /* this isn't good error handling, but this only happens if
+     out-of-memory (we can't do anything useful) or if we passed wrong
+     arguments - which is a bug */
+  assert(hWnd != NULL);
 #endif /* !ENABLE_SDL */
 }
 
@@ -76,6 +84,9 @@ Window::set(ContainerWindow *parent, LPCTSTR cls, LPCTSTR text,
   this->left = left;
   this->top = top;
   canvas.set(width, height);
+
+  if (parent != NULL)
+    parent->add_child(*this);
 #else /* !ENABLE_SDL */
   DWORD ex_style = 0;
   DWORD style = WS_CLIPCHILDREN | WS_CLIPSIBLINGS;
@@ -140,6 +151,77 @@ Window::reset()
 #endif /* !ENABLE_SDL */
 }
 
+ContainerWindow *
+Window::get_root_owner()
+{
+#ifdef ENABLE_SDL
+  if (parent == NULL)
+    /* no parent?  We must be a ContainerWindow instance */
+    return (ContainerWindow *)this;
+
+  ContainerWindow *root = parent;
+  while (root->parent != NULL)
+    root = root->parent;
+
+  return root;
+#else /* !ENABLE_SDL */
+#ifdef WINDOWSPC
+  HWND hRoot = ::GetAncestor(hWnd, GA_ROOTOWNER);
+  if (hRoot == NULL)
+    return NULL;
+#else
+  HWND hRoot = hWnd;
+  while (true) {
+    HWND hParent = ::GetParent(hWnd);
+    if (hParent == NULL)
+      break;
+    hRoot = hParent;
+  }
+#endif
+
+  return (ContainerWindow *)get(hRoot);
+#endif /* !ENABLE_SDL */
+}
+
+#ifdef ENABLE_SDL
+
+Window *
+Window::get_focused_window()
+{
+  return focused ? this : NULL;
+}
+
+void
+Window::set_focus()
+{
+  if (parent != NULL)
+    parent->set_active_child(*this);
+
+  if (focused)
+    return;
+
+  on_setfocus();
+}
+
+void
+Window::expose(const RECT &rect)
+{
+  canvas.expose(rect.left, rect.top,
+                rect.right - rect.left, rect.bottom - rect.top);
+  if (parent != NULL)
+    parent->expose_child(*this);
+}
+
+void
+Window::expose()
+{
+  canvas.expose();
+  if (parent != NULL)
+    parent->expose_child(*this);
+}
+
+#endif /* ENABLE_SDL */
+
 bool
 Window::on_create()
 {
@@ -149,7 +231,10 @@ Window::on_create()
 bool
 Window::on_destroy()
 {
-#ifndef ENABLE_SDL
+#ifdef ENABLE_SDL
+  if (parent != NULL)
+    parent->remove_child(*this);
+#else /* !ENABLE_SDL */
   assert(hWnd != NULL);
 
   hWnd = NULL;
@@ -161,7 +246,12 @@ Window::on_destroy()
 bool
 Window::on_close()
 {
+#ifdef ENABLE_SDL
+  reset();
+  return true;
+#else /* !ENABLE_SDL */
   return false;
+#endif /* !ENABLE_SDL */
 }
 
 bool
@@ -208,7 +298,7 @@ Window::on_key_up(unsigned key_code)
 }
 
 bool
-Window::on_command(HWND hWnd, unsigned id, unsigned code)
+Window::on_command(unsigned id, unsigned code)
 {
   return false;
 }
@@ -216,13 +306,27 @@ Window::on_command(HWND hWnd, unsigned id, unsigned code)
 bool
 Window::on_setfocus()
 {
+#ifdef ENABLE_SDL
+  assert(!focused);
+
+  focused = true;
+  return true;
+#else /* !ENABLE_SDL */
   return false;
+#endif /* !ENABLE_SDL */
 }
 
 bool
 Window::on_killfocus()
 {
+#ifdef ENABLE_SDL
+  assert(focused);
+
+  focused = false;
+  return true;
+#else /* !ENABLE_SDL */
   return false;
+#endif /* !ENABLE_SDL */
 }
 
 bool
@@ -237,7 +341,23 @@ Window::on_user(unsigned id)
   return false;
 }
 
-#ifndef ENABLE_SDL
+#ifdef ENABLE_SDL
+
+void
+Window::on_paint(Canvas &canvas)
+{
+  /* to be implemented by a subclass */
+  /* this is not an abstract method yet until the OO transition of all
+     SDL Window users is complete */
+}
+
+bool
+Window::on_event(const SDL_Event &event)
+{
+  return false;
+}
+
+#else /* !ENABLE_SDL */
 
 LRESULT
 Window::on_unhandled_message(HWND hWnd, UINT message,
@@ -323,7 +443,7 @@ Window::on_message(HWND _hWnd, UINT message,
 
   case WM_COMMAND:
     XCSoarInterface::InterfaceTimeoutReset();
-    if (on_command((HWND)lParam, LOWORD(wParam), HIWORD(wParam))) {
+    if (on_command(LOWORD(wParam), HIWORD(wParam))) {
       /* true returned: message was handled */
       ResetDisplayTimeOut();
       return 0;

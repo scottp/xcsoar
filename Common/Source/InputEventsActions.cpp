@@ -70,12 +70,10 @@ doc/html/advanced/input/ALL		http://xcsoar.sourceforge.net/advanced/input/
 #include "Dialogs.h"
 #include "Message.h"
 #include "Marks.h"
-#include <commctrl.h>
 #include "Airspace.h"
 #include "InfoBoxLayout.h"
 #include "InfoBoxManager.h"
 #include "Device/device.h"
-#include "Message.h"
 #include "Units.hpp"
 #include "MainWindow.hpp"
 #include "Atmosphere.h"
@@ -103,11 +101,17 @@ doc/html/advanced/input/ALL		http://xcsoar.sourceforge.net/advanced/input/
 #include <ctype.h>
 #include <tchar.h>
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
 
-
+#ifdef WIN32
 // DLL Cache
 typedef void (CALLBACK *DLLFUNC_INPUTEVENT)(TCHAR*);
 typedef void (CALLBACK *DLLFUNC_SETHINST)(HMODULE);
+#endif /* WIN32 */
 
 
 #define MAX_DLL_CACHE 256
@@ -138,7 +142,7 @@ void InputEvents::eventSounds(const TCHAR *misc) {
  // bool OldEnableSoundVario = EnableSoundVario;
 
   if (_tcscmp(misc, TEXT("toggle")) == 0)
-    SetSettingsComputer().EnableSoundVario = 
+    SetSettingsComputer().EnableSoundVario =
       !SettingsComputer().EnableSoundVario;
   else if (_tcscmp(misc, TEXT("on")) == 0)
     SetSettingsComputer().EnableSoundVario = true;
@@ -191,7 +195,7 @@ void InputEvents::eventVisualGlide(const TCHAR *misc) {
 
   if (_tcscmp(misc, TEXT("toggle")) == 0) {
     SetSettingsMap().VisualGlide ++;
-    if (SettingsMap().VisualGlide==2 && 
+    if (SettingsMap().VisualGlide==2 &&
 	!SettingsMap().ExtendedVisualGlide) SetSettingsMap().VisualGlide=0;
     if (SettingsMap().VisualGlide>2) {
       SetSettingsMap().VisualGlide=0;
@@ -341,7 +345,7 @@ void InputEvents::eventScreenModes(const TCHAR *misc) {
 
 #else // UNDEFINED PNA
     if (SettingsMap().EnableAuxiliaryInfo) {
-      if (SettingsComputer().EnableSoundModes) 
+      if (SettingsComputer().EnableSoundModes)
 	PlayResource(TEXT("IDR_WAV_CLICK"));
       SetSettingsMap().FullScreen = !SettingsMap().FullScreen;
       SetSettingsMap().EnableAuxiliaryInfo = false;
@@ -550,7 +554,7 @@ void InputEvents::eventFLARMRadar(const TCHAR *misc) {
 
   if (_tcscmp(misc, TEXT("ForceToggle")) == 0) {
     gauge_flarm->ForceVisible = !gauge_flarm->ForceVisible;
-    SetSettingsMap().EnableFLARMGauge = 
+    SetSettingsMap().EnableFLARMGauge =
       gauge_flarm->ForceVisible;
   } else
     gauge_flarm->Suppress = !gauge_flarm->Suppress;
@@ -675,6 +679,7 @@ void InputEvents::eventMainMenu(const TCHAR *misc) {
 //  See the checklist dialog section of the reference manual for more info.
 void InputEvents::eventChecklist(const TCHAR *misc) {
 	(void)misc;
+  ScopePopupBlock block(main_window.popup);
   dlgChecklistShowModal();
 }
 
@@ -683,6 +688,7 @@ void InputEvents::eventChecklist(const TCHAR *misc) {
 //  See the checklist dialog section of the reference manual for more info.
 void InputEvents::eventFlarmTraffic(const TCHAR *misc) {
 	(void)misc;
+  ScopePopupBlock block(main_window.popup);
   dlgFlarmTrafficShowModal();
 }
 
@@ -692,6 +698,7 @@ void InputEvents::eventFlarmTraffic(const TCHAR *misc) {
 // for more info.
 void InputEvents::eventCalculator(const TCHAR *misc) {
 	(void)misc;
+  ScopePopupBlock block(main_window.popup);
   dlgTaskCalculatorShowModal();
 }
 
@@ -703,6 +710,7 @@ void InputEvents::eventCalculator(const TCHAR *misc) {
 //  See the status dialog section of the reference manual for more info
 //  on these.
 void InputEvents::eventStatus(const TCHAR *misc) {
+  ScopePopupBlock block(main_window.popup);
   if (_tcscmp(misc, TEXT("system")) == 0) {
     dlgStatusShowModal(1);
   } else if (_tcscmp(misc, TEXT("task")) == 0) {
@@ -740,9 +748,12 @@ void InputEvents::eventWaypointDetails(const TCHAR *misc) {
       Message::AddMessage(TEXT("No Active Waypoint!"));
       return;
     }
+
+    ScopePopupBlock block(main_window.popup);
     PopupWaypointDetails();
   } else
     if (_tcscmp(misc, TEXT("select")) == 0) {
+      ScopePopupBlock block(main_window.popup);
       int res = dlgWayPointSelect(Basic().Location);
       if (res != -1){
 	task.setSelected(res);
@@ -754,6 +765,7 @@ void InputEvents::eventWaypointDetails(const TCHAR *misc) {
 
 
 void InputEvents::eventGotoLookup(const TCHAR *misc) {
+  ScopePopupBlock block(main_window.popup);
   int res = dlgWayPointSelect(Basic().Location);
   if (res != -1){
     task.FlyDirectTo(res, SettingsComputer());
@@ -942,6 +954,7 @@ void InputEvents::eventAdjustVarioFilter(const TCHAR *misc) {
     return;
   }
   if (_tcscmp(misc, TEXT("xdemo")) == 0) {
+    ScopePopupBlock block(main_window.popup);
     dlgVegaDemoShowModal();
     return;
   }
@@ -1232,6 +1245,8 @@ void InputEvents::eventNearestAirspaceDetails(const TCHAR *misc) {
     return;
   }
 
+  ScopePopupBlock block(main_window.popup);
+
   if (foundcircle != -1) {
     i = foundcircle;
 
@@ -1372,6 +1387,7 @@ void SystemConfiguration(void);
 //  Airspace: Airspace filter settings
 //  Replay: IGC replay dialog
 void InputEvents::eventSetup(const TCHAR *misc) {
+  ScopePopupBlock block(main_window.popup);
 
   if (_tcscmp(misc,TEXT("Basic"))==0){
     dlgBasicSettingsShowModal();
@@ -1401,10 +1417,15 @@ void InputEvents::eventSetup(const TCHAR *misc) {
 
 }
 
+#ifdef WIN32
+static HINSTANCE
+_loadDLL(TCHAR *name);
+#endif /* WIN32 */
 
 // DLLExecute
 // Runs the plugin of the specified filename
 void InputEvents::eventDLLExecute(const TCHAR *misc) {
+#ifdef WIN32
   // LoadLibrary(TEXT("test.dll"));
 
   StartupStore(TEXT("%s\n"), misc);
@@ -1464,12 +1485,18 @@ void InputEvents::eventDLLExecute(const TCHAR *misc) {
 #endif
     }
   }
+#else /* !WIN32 */
+  // XXX implement with dlopen()
+#endif /* !WIN32 */
 }
 
+#ifdef WIN32
 // Load a DLL (only once, keep a cache of the handle)
 //	TODO code: FreeLibrary - it would be nice to call FreeLibrary
 //      before exit on each of these
-HINSTANCE _loadDLL(TCHAR *name) {
+static HINSTANCE
+_loadDLL(TCHAR *name)
+{
   int i;
   for (i = 0; i < DLLCache_Count; i++) {
     if (_tcscmp(name, DLLCache[i].text) == 0)
@@ -1503,6 +1530,7 @@ HINSTANCE _loadDLL(TCHAR *name) {
 
   return NULL;
 }
+#endif /* WIN32 */
 
 // AdjustForecastTemperature
 // Adjusts the maximum ground temperature used by the convection forecast
@@ -1527,6 +1555,7 @@ void InputEvents::eventAdjustForecastTemperature(const TCHAR *misc) {
 // Runs an external program of the specified filename.
 // Note that XCSoar will wait until this program exits.
 void InputEvents::eventRun(const TCHAR *misc) {
+#ifdef WIN32
   PROCESS_INFORMATION pi;
   if (!::CreateProcess(misc,
 		       NULL, NULL, NULL, FALSE, 0, NULL, NULL, NULL, &pi))
@@ -1534,6 +1563,10 @@ void InputEvents::eventRun(const TCHAR *misc) {
 
   // wait for program to finish!
   ::WaitForSingleObject(pi.hProcess, INFINITE);
+
+#else /* !WIN32 */
+  system(misc);
+#endif /* !WIN32 */
 }
 
 
@@ -1562,6 +1595,7 @@ void InputEvents::eventDeclutterLabels(const TCHAR *misc) {
 
 void InputEvents::eventBrightness(const TCHAR *misc) {
 	(void)misc;
+  ScopePopupBlock block(main_window.popup);
   dlgBrightnessShowModal();
 }
 

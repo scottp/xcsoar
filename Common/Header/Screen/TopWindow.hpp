@@ -88,19 +88,14 @@ public:
 
   void full_screen();
 
-  void update() {
 #ifdef ENABLE_SDL
-    // XXX
-    screen.copy(canvas);
-    screen.update(0, 0, screen.get_width(), screen.get_height());
-#else /* !ENABLE_SDL */
-    ::UpdateWindow(hWnd);
-#endif /* !ENABLE_SDL */
-  }
+  virtual void expose(const RECT &rect);
+  virtual void expose();
+#endif /* ENABLE_SDL */
 
   void close() {
 #ifdef ENABLE_SDL
-    // XXX
+    on_close();
 #else /* ENABLE_SDL */
     ::SendMessage(hWnd, WM_CLOSE, 0, 0);
 #endif
@@ -110,10 +105,18 @@ protected:
   virtual bool on_activate();
   virtual bool on_deactivate();
 
-#ifndef ENABLE_SDL
+#ifdef ENABLE_SDL
+  virtual bool on_event(const SDL_Event &event);
+#else /* !ENABLE_SDL */
   virtual LRESULT on_message(HWND _hWnd, UINT message,
                              WPARAM wParam, LPARAM lParam);
 #endif /* !ENABLE_SDL */
+
+public:
+  /**
+   * Runs the event loop until the application quits.
+   */
+  int event_loop(unsigned accelerators_id);
 };
 
 #endif

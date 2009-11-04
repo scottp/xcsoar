@@ -2,7 +2,6 @@
 #include "resource.h"
 #include "Protection.hpp"
 #include "InfoBoxManager.h"
-#include "Message.h"
 #include "Interface.hpp"
 #include "ButtonLabel.hpp"
 #include "Screen/Graphics.hpp"
@@ -19,6 +18,10 @@
 #include "Asset.hpp" /* for SCREENWIDTH and SCREENHEIGHT */
 #endif
 
+/**
+ * Destructor of the MainWindow-Class
+ * @return
+ */
 MainWindow::~MainWindow()
 {
   if (vario != NULL)
@@ -80,7 +83,7 @@ MainWindow::set(LPCTSTR text,
   InfoBoxLayout::ScreenGeometry(rc);
 
   // color/pattern chart (must have infobox geometry before this)
-  MapGfx.Initialise(XCSoarInterface::hInst, 
+  MapGfx.Initialise(XCSoarInterface::hInst,
 		    XCSoarInterface::SettingsMap());
 
   StartupStore(TEXT("Create info boxes\n"));
@@ -104,7 +107,6 @@ MainWindow::set(LPCTSTR text,
   popup.set(rc);
 }
 
-///////////////////////////////////////////////////////////////////////////
 // Windows event handlers
 
 Brush *

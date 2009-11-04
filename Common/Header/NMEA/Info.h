@@ -62,67 +62,269 @@ struct SWITCH_INFO
 
 struct NMEA_INFO
 {
+  //############
+  //   Status
+  //############
+
+  /**
+   * Is a GPS unit connected?
+   *
+   * 0 = not connected
+   * 1 = connected, waiting for fix
+   * 2 = connected, fix found
+   */
   unsigned Connected;
+
+  /** GPS fix not valid */
+  int NAVWarning;
+
+  /** Number of satellites used for gps fix */
+  int SatellitesUsed;
+
+  /** GPS Satellite ids */
+  int SatelliteIDs[MAXSATELLITES];
+
+  /** Is the GPS unit moving? (Speed > 2.0) */
+  bool MovementDetected;
+
+  //################
+  //   Navigation
+  //################
+
+  /** Current Location (lat/lon) */
   GEOPOINT Location;
+
+  /** Track angle in degrees */
   double TrackBearing;
+
+  /** not in use(?) */
+  double CrossTrackError;
+
+  //############
+  //   Speeds
+  //############
+
+  /**
+   * Speed over ground in m/s
+   * @see TrueAirspeed
+   * @see IndicatedAirspeed
+   */
   double Speed;
+
+  /**
+   * Is air speed information available?
+   * @see TrueAirspeed
+   */
+  bool AirspeedAvailable;
+  /**
+   * Indicated air speed (if available)
+   * @see Speed
+   * @see TrueAirspeed
+   * @see AirDensityRatio
+   */
+  double IndicatedAirspeed;
+  /**
+   * True air speed (if available)
+   * @see Speed
+   * @see IndicatedAirspeed
+   */
+  double TrueAirspeed;
+
+  //##############
+  //   Altitude
+  //##############
+
+  /** GPS Altitude */
   double Altitude;
+
+  /**
+   * Is a barometric altitude available?
+   * @see BaroAltitude
+   */
+  bool BaroAltitudeAvailable;
+  /**
+   * Barometric altitude (if available)
+   * @see BaroAltitudeAvailable
+   * @see Altitude
+   */
+  double BaroAltitude;
+
+  //##########
+  //   Time
+  //##########
+
+  /** GPS time */
+  double Time;
+  /** GPS time (hours) */
+  int Hour;
+  /** GPS time (minutes) */
+  int Minute;
+  /**< GPS time (seconds) */
+  int Second;
+  /**< GPS date (month) */
+  int Month;
+  /**< GPS date (day) */
+  int Day;
+  /**< GPS date (year) */
+  int Year;
+
+  //###########
+  //   Vario
+  //###########
+
+  /**
+   * Is an external vario signal available?
+   * @see Vario
+   */
+  bool VarioAvailable;
+  /**
+   * Vario signal of external device (if available)
+   * @see VarioAvailable
+   */
+  double Vario;
+
+  /**
+   * Is an external netto vario signal available?
+   * @see NettoVario
+   */
+  bool NettoVarioAvailable;
+  /**
+   * Netto vario signal of external device (if available)
+   * @see NettoVarioAvailable
+   */
+  double NettoVario;
+
+  //##############
+  //   Settings
+  //##############
+
+  /** MacCready value of external device (if available) */
+  double MacReady;
+
+  /** Ballast information of external device (if available) */
+  double Ballast;
+
+  /** Bugs information of external device (if available) */
+  double Bugs;
+
+  //##################
+  //   Acceleration
+  //##################
+
+  /**
+   * Is G-load information available?
+   * @see Gload
+   * @see AccelX
+   * @see AccelY
+   */
+  bool AccelerationAvailable;
+  /**
+   * G-Load information of external device (if available)
+   * @see AccelerationAvailable
+   */
+  double Gload;
+  /**
+   * G-Load information of external device in X-direction (if available)
+   * @see AccelerationAvailable
+   */
+  double AccelX;
+  /**
+   * G-Load information of external device in Y-direction (if available)
+   * @see AccelerationAvailable
+   */
+  double AccelZ;
+
+  //################
+  //   Atmosphere
+  //################
+
+  /**
+   * Is external wind information available?
+   * @see ExternalWindSpeed
+   * @see ExternalWindDirection
+   */
+  bool ExternalWindAvailalbe;
+  /**
+   * Wind speed of external device (if available)
+   * @see ExternalWindDirection
+   * @see ExternalWindAvailalbe
+   */
+  double ExternalWindSpeed;
+  /**
+   * Wind direction of external device (if available)
+   * @see ExternalWindSpeed
+   * @see ExternalWindAvailalbe
+   */
+  double ExternalWindDirection;
+
+  /**
+   * Is temperature information available?
+   * @see OutsideAirTemperatur
+   */
+  bool TemperatureAvailable;
+  /**
+   * Temperature of outside air (if available)
+   * @see TemperatureAvailable
+   */
+  double OutsideAirTemperature;
+
+  /**
+   * Is humidity information available?
+   * @see RelativeHumidity
+   */
+  bool HumidityAvailable;
+  /**
+   * Humidity of outside air (if available)
+   * @see HumidityAvailable
+   */
+  double RelativeHumidity;
+
+  //###########
+  //   FLARM
+  //###########
+
+  /** Number of received FLARM devices */
+  unsigned short FLARM_RX;
+  /** Transmit status */
+  unsigned short FLARM_TX;
+  /** GPS status */
+  unsigned short FLARM_GPS;
+  /** Alarm level of FLARM (0-3) */
+  unsigned short FLARM_AlarmLevel;
+  /** Is FLARM information available? */
+  bool FLARM_Available;
+  /** Flarm traffic information */
+  FLARM_TRAFFIC FLARM_Traffic[FLARM_MAX_TRAFFIC];
+  /**
+   * Is there FLARM traffic present?
+   * @see FLARM_Traffic
+   */
+  bool FLARMTraffic;
+  /**
+   * Is there new FLARM traffic present?
+   * @see FLARM_Traffic
+   */
+  bool NewTraffic;
+
+  //###########
+  //   Other
+  //###########
+
+  /** Battery supply voltage information (if available) */
+  double SupplyBatteryVoltage;
+
+  /** Switch state of the user inputs */
+  SWITCH_INFO SwitchState;
+
+  double StallRatio;
+
+  /** Is XCSoar in replay mode? */
+  bool Replay;
+
   //  TCHAR  WaypointID[WAY_POINT_ID_SIZE + 1];
   //  double WaypointBearing;
   //  double WaypointDistance;
   //  double WaypointSpeed; IGNORED NOW
-  double CrossTrackError;
-  double Time;
-  int Hour;
-  int Minute;
-  int Second;
-  int Month;
-  int Day;
-  int Year;
-  int NAVWarning;
-  double IndicatedAirspeed;
-  double TrueAirspeed;
-  double BaroAltitude;
-  double MacReady;
-  bool BaroAltitudeAvailable;
-  bool ExternalWindAvailalbe;
-  double ExternalWindSpeed;
-  double ExternalWindDirection;
-  bool VarioAvailable;
-  bool NettoVarioAvailable;
-  bool AirspeedAvailable;
-  double Vario;
-  double NettoVario;
-  double Ballast;
-  double Bugs;
-  double Gload;
-  bool AccelerationAvailable;
-  double AccelX;
-  double AccelZ;
-  int SatellitesUsed;
-  bool TemperatureAvailable;
-  double OutsideAirTemperature;
-  bool HumidityAvailable;
-  double RelativeHumidity;
-
-  unsigned short FLARM_RX;
-  unsigned short FLARM_TX;
-  unsigned short FLARM_GPS;
-  unsigned short FLARM_AlarmLevel;
-  bool FLARM_Available;
-  FLARM_TRAFFIC FLARM_Traffic[FLARM_MAX_TRAFFIC];
-  bool FLARMTraffic;
-  bool NewTraffic;
-  int SatelliteIDs[MAXSATELLITES];
-
-  double SupplyBatteryVoltage;
-
-  SWITCH_INFO SwitchState;
-
-  bool MovementDetected;
-
-  double StallRatio;
-  bool Replay;
 };
 
 #endif

@@ -48,6 +48,7 @@ Copyright_License {
 
 typedef wchar_t TCHAR;
 #define _stprintf wsprintf
+#define _vstprintf vswprintf
 #define _sntprintf wsnprintf
 #define _ftprintf fwprintf
 #define _vftprintf vfwprintf
@@ -55,6 +56,9 @@ typedef wchar_t TCHAR;
 #define _tcscpy wcscpy
 #define tcslen wcslen
 #define _tcscmp wcscmp
+#define _tcsncmp wcscmp
+#define _tcsicmp wcscasecmp
+#define _tcsnicmp wcsncasecmp
 #define _tcslen wcslen
 #define _tcsclen wcslen
 #define _tcsncpy wcsncpy
@@ -69,6 +73,7 @@ typedef wchar_t TCHAR;
 #define _tcstok wcstok
 //#define _totupper XXX
 #define _itot _itow
+#define _ttoi(x) wcstol((x), NULL, 10)
 #define _tcstol wcstol
 #define _tcstod wcstod
 
@@ -81,6 +86,7 @@ typedef wchar_t TCHAR;
 
 typedef char TCHAR;
 #define _stprintf sprintf
+#define _vstprintf vsprintf
 #define _sntprintf snprintf
 #define _ftprintf fprintf
 #define _vftprintf vfprintf
@@ -88,6 +94,9 @@ typedef char TCHAR;
 #define _tcscpy strcpy
 #define tcslen strlen
 #define _tcscmp strcmp
+#define _tcsncmp strncmp
+#define _tcsicmp strcasecmp
+#define _tcsnicmp strncasecmp
 #define _tcslen strlen
 #define _tcsclen strlen
 #define _tcsncpy strncpy
@@ -103,6 +112,7 @@ typedef char TCHAR;
 #define _tcstok strtok
 #define _totupper toupper
 #define _itot itoa
+#define _ttoi atoi
 #define _tcstol strtol
 #define _tcstod strtod
 #define _tcscspn strcspn

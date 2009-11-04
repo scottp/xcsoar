@@ -48,48 +48,62 @@ Copyright_License {
 #include "Airspace.h"
 #include "Screen/ProgressWindow.hpp"
 
-#include <commdlg.h>
-#include <commctrl.h>
-
-#ifndef WINDOWSPC
-#include "aygshell.h"
-#endif
-
 #include "UtilsText.hpp"
 #include "UtilsSystem.hpp"
 #include "LocalPath.hpp"
 #include "SettingsUser.hpp"
 #include "InfoBoxLayout.h"
 #include "InputEvents.h"
-#include "Message.h"
 #include "Registry.hpp"
 #include "Interface.hpp"
 
 ProgressWindow *XCSoarInterface::progress_window = NULL;
 
+#ifndef ENABLE_SDL
 HCURSOR ActionInterface::oldCursor = NULL;
+#endif /* !ENABLE_SDL */
 
+/**
+ * Activates the Hourglass animation
+ */
 void ActionInterface::StartHourglassCursor(void) {
+#ifdef ENABLE_SDL
+  // XXX
+#else /* !ENABLE_SDL */
   HCURSOR newc = LoadCursor(NULL, IDC_WAIT);
   oldCursor = (HCURSOR)SetCursor(newc);
 #ifdef GNAV
   SetCursorPos(160,120);
 #endif
+#endif /* !ENABLE_SDL */
 }
 
+/**
+ * Deactivates the Hourglass animation
+ */
 void ActionInterface::StopHourglassCursor(void) {
+#ifdef ENABLE_SDL
+  // XXX
+#else /* !ENABLE_SDL */
   SetCursor(oldCursor);
 #ifdef GNAV
   SetCursorPos(640,480);
 #endif
   oldCursor = NULL;
+#endif /* !ENABLE_SDL */
 }
 
+/**
+ * Closes the ProgressWindow
+ */
 void XCSoarInterface::CloseProgressDialog() {
   if (progress_window != NULL)
     delete progress_window;
 }
 
+/**
+ * Updates the ProgressWindow to go up one step
+ */
 void XCSoarInterface::StepProgressDialog(void) {
   if (progress_window != NULL)
     progress_window->step();
@@ -102,7 +116,10 @@ BOOL XCSoarInterface::SetProgressStepSize(int nSize) {
   return(TRUE);
 }
 
-
+/**
+ * Creates or updates the ProgressWindow
+ * @param text Text inside the progress bar
+ */
 void
 XCSoarInterface::CreateProgressDialog(const TCHAR* text) {
   if (progress_window == NULL)
@@ -112,15 +129,17 @@ XCSoarInterface::CreateProgressDialog(const TCHAR* text) {
   progress_window->set_pos(0);
 }
 
-
-///////////////
-
+/**
+ * Opens the Analysis window
+ */
 void PopupAnalysis()
 {
   dlgAnalysisShowModal();
 }
 
-
+/**
+ * Opens the WaypointDetails window
+ */
 void PopupWaypointDetails()
 {
   dlgWayPointDetailsShowModal();
@@ -130,6 +149,16 @@ void PopupWaypointDetails()
 #include "Interface.hpp"
 #include "MapWindow.h"
 
+/**
+ * Opens up the WaypointDetails window of the nearest
+ * waypoint to location
+ * @param way_points WayPointList including all possible
+ * waypoints for the calculation
+ * @param location Location where to search
+ * @param range Maximum range to search
+ * @param pan True if in Pan mode
+ * @return True if a waypoint was found
+ */
 bool
 PopupNearestWaypointDetails(const WayPointList &way_points,
                             const GEOPOINT &location,
@@ -161,7 +190,6 @@ PopupNearestWaypointDetails(const WayPointList &way_points,
 
   return false;
 }
-
 
 bool PopupInteriorAirspaceDetails(const GEOPOINT &location) {
   unsigned int i;

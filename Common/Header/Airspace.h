@@ -103,8 +103,6 @@ struct AIRSPACE_CIRCLE
   bool FarVisible;
 };
 
-/////////////////////////////////////////
-
 // Airspace Database
 extern AIRSPACE_AREA *AirspaceArea;
 extern AIRSPACE_POINT *AirspacePoint;
@@ -114,11 +112,8 @@ extern unsigned int NumberOfAirspacePoints;
 extern unsigned int NumberOfAirspaceAreas;
 extern unsigned int NumberOfAirspaceCircles;
 
-////////
-
 void DeleteAirspace();
 
-///////////////////////////////////////
 void ReadAirspace(void);
 int FindAirspaceCircle(const GEOPOINT &location,
 		       bool visibleonly=true);
@@ -128,7 +123,6 @@ bool CheckAirspaceAltitude(const double &Base, const double &Top,
   const SETTINGS_COMPUTER &settings);
 void CloseAirspace(void);
 
-
 void SortAirspace(void);
 
 bool InsideAirspaceCircle(const GEOPOINT &location,
@@ -137,7 +131,7 @@ bool InsideAirspaceCircle(const GEOPOINT &location,
 bool InsideAirspaceArea(const GEOPOINT &location,
 			const int i);
 
-void ScanAirspaceLine(const GEOPOINT *locs, 
+void ScanAirspaceLine(const GEOPOINT *locs,
                       const double *heights,
 		      int airspacetype[AIRSPACE_SCANSIZE_H][AIRSPACE_SCANSIZE_X]);
 
@@ -170,13 +164,13 @@ public:
 
 };
 
-typedef enum {asaNull, 
-              asaItemAdded, 
-              asaItemChanged, 
-              asaClearAll, 
-              asaItemRemoved, 
-              asaWarnLevelIncreased, 
-              asaProcessEnd, 
+typedef enum {asaNull,
+              asaItemAdded,
+              asaItemChanged,
+              asaClearAll,
+              asaItemRemoved,
+              asaWarnLevelIncreased,
+              asaProcessEnd,
               asaProcessBegin} AirspaceWarningNotifyAction_t;
 
 typedef void (*AirspaceWarningNotifier_t)(AirspaceWarningNotifyAction_t Action, AirspaceInfo_c *AirSpace) ;

@@ -52,6 +52,12 @@ Copyright_License {
 #include "Protection.hpp"
 #include "Components.hpp"
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+
 static TCHAR szCalculationsPersistFileName[MAX_PATH]= TEXT("\0");
 static TCHAR szCalculationsPersistDirectory[MAX_PATH]= TEXT("\0");
 
@@ -91,7 +97,7 @@ void LoadCalculationsPersist(DERIVED_INFO *Calculated) {
     Calculated->Flying = false;
     Calculated->TimeInFlight = 0;
     Calculated->TimeOnGround = 60;
-    
+
     fread(&sizein, sizeof(sizein), 1, file);
     if (sizein != sizeof(glide_computer.GetFlightStats())) {
 
@@ -132,7 +138,7 @@ void LoadCalculationsPersist(DERIVED_INFO *Calculated) {
     //             size,&dwBytesWritten,(OVERLAPPED*)NULL);
 
     QNH = min(1113.2, max(QNH,913.2));
-    MACCREADY = min(10.0,max(MACCREADY,0));
+    MACCREADY = min(10.0, max(MACCREADY, 0.0));
     BUGS = min(1.0, max(BUGS,0.0));
     BALLAST = min(1.0, max(BALLAST,0.0));
     //   CRUISE_EFFICIENCY = min(1.5, max(CRUISE_EFFICIENCY,0.75));

@@ -64,7 +64,6 @@ doc/html/advanced/input/ALL		http://xcsoar.sourceforge.net/advanced/input/
 #include "Interface.hpp"
 #include "LogFile.hpp"
 #include "Compatibility/vk.h"
-#include <commctrl.h>
 #include "InfoBoxLayout.h"
 #include "ButtonLabel.hpp"
 #include "Registry.hpp"
@@ -677,7 +676,7 @@ InputEvents::drawButtons(mode Mode)
 {
   int i;
 
-  if (!globalRunningEvent.test()) return; 
+  if (!globalRunningEvent.test()) return;
 
   for (i = 0; i < ModeLabel_count[Mode]; i++) {
     if ((ModeLabel[Mode][i].location > 0)) {
@@ -702,7 +701,7 @@ InputEvents::mode InputEvents::getModeID() {
 
 // Input is a via the user touching the label on a touch screen / mouse
 bool InputEvents::processButton(int bindex) {
-  if (!globalRunningEvent.test()) return false; 
+  if (!globalRunningEvent.test()) return false;
 
   mode thismode = getModeID();
 
@@ -747,7 +746,7 @@ bool InputEvents::processButton(int bindex) {
   Return = We had a valid key (even if nothing happens because of Bounce)
 */
 bool InputEvents::processKey(int dWord) {
-  if (!globalRunningEvent.test()) return false; 
+  if (!globalRunningEvent.test()) return false;
 
   /* JMW illegal, should be done by gui handler loop
   InterfaceTimeoutReset();
@@ -834,7 +833,7 @@ bool InputEvents::processNmea(int ne_id) {
   Return = TRUE if we have a valid key match
 */
 bool InputEvents::processNmea_real(int ne_id) {
-  if (!globalRunningEvent.test()) return false; 
+  if (!globalRunningEvent.test()) return false;
   int event_id = 0;
 
   // JMW not required
@@ -922,7 +921,7 @@ bool InputEvents::processGlideComputer(int gce_id) {
   Take virtual inputs from a Glide Computer to do special events
 */
 bool InputEvents::processGlideComputer_real(int gce_id) {
-  if (!globalRunningEvent.test()) return false; 
+  if (!globalRunningEvent.test()) return false;
   int event_id = 0;
 
   // TODO feature: Log glide computer events to IGC file
@@ -952,7 +951,7 @@ bool InputEvents::processGlideComputer_real(int gce_id) {
 
 // EXECUTE an Event - lookup event handler and call back - no return
 void InputEvents::processGo(int eventid) {
-  if (!globalRunningEvent.test()) return; 
+  if (!globalRunningEvent.test()) return;
 
   //
   // TODO feature: event/macro recorder
@@ -1024,7 +1023,7 @@ void InputEvents::ProcessMenuTimer() {
   }
 }
 
-void 
+void
 InputEvents::ProcessTimer() {
   if (globalRunningEvent.test()) {
     DoQueuedEvents();

@@ -49,15 +49,22 @@ Copyright_License {
 
 DeviceBlackboard device_blackboard;
 
-void 
-DeviceBlackboard::Initialise() 
+/**
+ * Initializes the DeviceBlackboard
+ */
+void
+DeviceBlackboard::Initialise()
 {
   ScopeLock protect(mutexBlackboard);
 
+  // Clear the gps_info and calculated_info
   memset( &gps_info, 0, sizeof(NMEA_INFO));
   memset( &calculated_info, 0, sizeof(DERIVED_INFO));
 
-  gps_info.NAVWarning = true; // default, no gps at all!
+  // Set the NAVWarning positive (assume not gps found yet)
+  gps_info.NAVWarning = true;
+
+  // Clear the SwitchStates
   gps_info.SwitchState.AirbrakeLocked = false;
   gps_info.SwitchState.FlapPositive = false;
   gps_info.SwitchState.FlapNeutral = false;
@@ -71,6 +78,7 @@ DeviceBlackboard::Initialise()
   gps_info.SwitchState.UserSwitchDown = false;
   gps_info.SwitchState.VarioCircling = false;
 
+  // Set GPS assumed time to system time
   SYSTEMTIME pda_time;
   GetSystemTime(&pda_time);
   gps_info.Time  = pda_time.wHour*3600+pda_time.wMinute*60+pda_time.wSecond;
@@ -91,20 +99,38 @@ DeviceBlackboard::Initialise()
 #endif
 }
 
-void 
+/**
+ * Sets the location and altitude to loc and alt
+ *
+ * Called at startup when no gps data available yet
+ * @param loc New location
+ * @param alt New altitude
+ */
+void
 DeviceBlackboard::SetStartupLocation(const GEOPOINT &loc,
-				     const double alt) 
+				     const double alt)
 {
   ScopeLock protect(mutexBlackboard);
   SetBasic().Location = loc;
   SetBasic().Altitude = alt;
 }
 
-// used by replay logger
-void 
+/**
+ * Sets the location, altitude and other basic parameters
+ *
+ * Used by the ReplayLogger
+ * @param loc New location
+ * @param speed New speed
+ * @param bearing New bearing
+ * @param alt New altitude
+ * @param baroalt New barometric altitude
+ * @param t New time
+ * @see ReplayLogger::UpdateInternal()
+ */
+void
 DeviceBlackboard::SetLocation(const GEOPOINT &loc,
 			      const double speed, const double bearing,
-			      const double alt, const double baroalt, const double t) 
+			      const double alt, const double baroalt, const double t)
 {
   ScopeLock protect(mutexBlackboard);
   SetBasic().Location = loc;
@@ -117,27 +143,38 @@ DeviceBlackboard::SetLocation(const GEOPOINT &loc,
   SetBasic().Replay = true;
 };
 
+/**
+ * Stops the replay
+ */
 void DeviceBlackboard::StopReplay() {
   ScopeLock protect(mutexBlackboard);
   SetBasic().Speed = 0;
   SetBasic().Replay = false;
 }
 
-
-//////////////////
-
-
-void 
+/**
+ * Sets the NAVWarning to val
+ * @param val New value for NAVWarning
+ */
+void
 DeviceBlackboard::SetNAVWarning(bool val)
 {
   ScopeLock protect(mutexBlackboard);
   SetBasic().NAVWarning = val;
   if (!val) {
+    // QUESTION TB: what going on here?
     // externally forced
     SetBasic().SatellitesUsed = 6;
   }
 }
 
+/**
+ * Lowers the connection status of the device
+ *
+ * Connected + Fix -> Connected + No Fix
+ * Connected + No Fix -> Not connected
+ * @return True if still connected afterwards, False otherwise
+ */
 bool
 DeviceBlackboard::LowerConnection()
 {
@@ -154,6 +191,9 @@ DeviceBlackboard::LowerConnection()
   return retval;
 }
 
+/**
+ * Raises the connection status to connected + fix
+ */
 void
 DeviceBlackboard::RaiseConnection()
 {
@@ -167,8 +207,8 @@ DeviceBlackboard::ProcessSimulation()
 {
   ScopeLock protect(mutexBlackboard);
   SetNAVWarning(false);
-  FindLatitudeLongitude(Basic().Location, 
-			Basic().TrackBearing, 
+  FindLatitudeLongitude(Basic().Location,
+			Basic().TrackBearing,
 			Basic().Speed*1.0,
 			&SetBasic().Location);
   SetBasic().Time+= 1.0;
@@ -186,6 +226,12 @@ DeviceBlackboard::ProcessSimulation()
 }
 #endif /* _SIM_ */
 
+/**
+ * Sets the GPS speed and indicated airspeed to val
+ *
+ * not in use
+ * @param val New speed
+ */
 void
 DeviceBlackboard::SetSpeed(double val)
 {
@@ -194,6 +240,12 @@ DeviceBlackboard::SetSpeed(double val)
   SetBasic().IndicatedAirspeed = val;
 }
 
+/**
+ * Sets the TrackBearing to val
+ *
+ * not in use
+ * @param val New TrackBearing
+ */
 void
 DeviceBlackboard::SetTrackBearing(double val)
 {
@@ -201,6 +253,12 @@ DeviceBlackboard::SetTrackBearing(double val)
   SetBasic().TrackBearing = AngleLimit360(val);
 }
 
+/**
+ * Sets the altitude and barometric altitude to val
+ *
+ * not in use
+ * @param val New altitude
+ */
 void
 DeviceBlackboard::SetAltitude(double val)
 {
@@ -209,53 +267,86 @@ DeviceBlackboard::SetAltitude(double val)
   SetBasic().BaroAltitude = val;
 }
 
-void 
+/**
+ * Reads the given derived_info usually provided by the
+ * GlideComputerBlackboard and saves it to the own Blackboard
+ * @param derived_info Calculated information usually provided
+ * by the GlideComputerBlackboard
+ */
+void
 DeviceBlackboard::ReadBlackboard(const DERIVED_INFO &derived_info)
 {
   memcpy(&calculated_info,&derived_info,sizeof(DERIVED_INFO));
 }
 
-void 
-DeviceBlackboard::ReadSettingsComputer(const SETTINGS_COMPUTER 
-					      &settings) 
+/**
+ * Reads the given settings usually provided by the InterfaceBlackboard
+ * and saves it to the own Blackboard
+ * @param settings SettingsComputer usually provided by the
+ * InterfaceBlackboard
+ */
+void
+DeviceBlackboard::ReadSettingsComputer(const SETTINGS_COMPUTER
+					      &settings)
 {
   memcpy(&settings_computer,&settings,sizeof(SETTINGS_COMPUTER));
 }
 
-void 
-DeviceBlackboard::ReadSettingsMap(const SETTINGS_MAP 
-				  &settings) 
+/**
+ * Reads the given settings usually provided by the InterfaceBlackboard
+ * and saves it to the own Blackboard
+ * @param settings SettingsMap usually provided by the
+ * InterfaceBlackboard
+ */
+void
+DeviceBlackboard::ReadSettingsMap(const SETTINGS_MAP
+				  &settings)
 {
   memcpy(&settings_map,&settings,sizeof(SETTINGS_MAP));
 }
 
-void 
+/**
+ * Checks for timeout of the FLARM targets and
+ * saves the status to Basic()
+ */
+void
 DeviceBlackboard::FLARM_RefreshSlots() {
   int i;
   bool present = false;
-  if (Basic().FLARM_Available) {
 
+  // if (Flarm data is available)
+  if (Basic().FLARM_Available) {
+    // for each item in FLARM_Traffic
     for (i=0; i<FLARM_MAX_TRAFFIC; i++) {
+      // if (FLARM_Traffic[i] has data)
       if (Basic().FLARM_Traffic[i].ID>0) {
-	if ((Basic().Time> Basic().FLARM_Traffic[i].Time_Fix+2)
-	    || (Basic().Time< Basic().FLARM_Traffic[i].Time_Fix)) {
-	  // clear this slot if it is too old (2 seconds), or if
-	  // time has gone backwards (due to replay)
-	  SetBasic().FLARM_Traffic[i].ID= 0;
-	  SetBasic().FLARM_Traffic[i].Name[0] = 0;
-	} else {
-	  present = true;
-	}
+        // if (FLARM target is too old or time has gone backwards)
+        if ((Basic().Time > Basic().FLARM_Traffic[i].Time_Fix + 2)
+            || (Basic().Time < Basic().FLARM_Traffic[i].Time_Fix)) {
+          // clear this slot if it is too old (2 seconds), or if
+          // time has gone backwards (due to replay)
+          SetBasic().FLARM_Traffic[i].ID = 0;
+          SetBasic().FLARM_Traffic[i].Name[0] = 0;
+        } else {
+          // FLARM data is present
+          present = true;
+        }
       }
     }
   }
+
+  // Save the status of present into Basic()
   SetBasic().FLARMTraffic = present;
   SetBasic().NewTraffic = false;
 }
 
+/**
+ * Sets the system time to GPS time if not yet done and
+ * defined in settings
+ */
 void
 DeviceBlackboard::SetSystemTime() {
-  // JMW, this should be done outside the parser..
+  // TODO JMW: this should be done outside the parser..
 #ifndef _SIM_
   // Altair doesn't have a battery-backed up realtime clock,
   // so as soon as we get a fix for the first time, set the
@@ -266,6 +357,8 @@ DeviceBlackboard::SetSystemTime() {
       && !sysTimeInitialised) {
     SYSTEMTIME sysTime;
     ::GetSystemTime(&sysTime);
+
+    // QUESTION TB: why do we save hours, mins and secs?!
     int hours = (int)Basic().Hour;
     int mins = (int)Basic().Minute;
     int secs = (int)Basic().Second;
@@ -277,7 +370,7 @@ DeviceBlackboard::SetSystemTime() {
     sysTime.wSecond = (unsigned short)secs;
     sysTime.wMilliseconds = 0;
     sysTimeInitialised = (::SetSystemTime(&sysTime)==true);
-    
+
 #if defined(GNAV) && !defined(WINDOWSPC)
     TIME_ZONE_INFORMATION tzi;
     tzi.Bias = -SettingsComputer().UTCOffset/60;
@@ -287,7 +380,7 @@ DeviceBlackboard::SetSystemTime() {
     _tcscpy(tzi.DaylightName,TEXT("Altair"));
     tzi.DaylightDate.wMonth= 0; // disable daylight savings
     tzi.DaylightBias = 0;
-    
+
     SetTimeZoneInformation(&tzi);
 #endif
     sysTimeInitialised =true;
@@ -295,30 +388,36 @@ DeviceBlackboard::SetSystemTime() {
 #endif
 }
 
-// TODO: this is a bit silly, it searches every time a target is
-// visible... going to be slow..
-// should only scan the first time it appears with that ID.
-
-// at least it is now not being done by the parser
-
+/**
+ * Tries to find a name for every current FLARM_Traffic id
+ */
 void
 DeviceBlackboard::FLARM_ScanTraffic()
 {
-  if (Basic().FLARM_Available) {
+  // TODO: this is a bit silly, it searches every time a target is
+  // visible... going to be slow..
+  // should only scan the first time it appears with that ID.
+  // at least it is now not being done by the parser
 
+  // if (FLARM data is available)
+  if (Basic().FLARM_Available) {
+    // for each item in FLARM_Traffic
     for (int flarm_slot=0; flarm_slot<FLARM_MAX_TRAFFIC; flarm_slot++) {
+      // if (FLARM_Traffic[flarm_slot] has data)
       if (Basic().FLARM_Traffic[flarm_slot].ID>0) {
-       	
-	if (!_tcslen(Basic().FLARM_Traffic[flarm_slot].Name)) {
-	  // need to lookup name for this target
-	  const TCHAR *fname = 
-	    LookupFLARMDetails(Basic().FLARM_Traffic[flarm_slot].ID);
-	  if (fname) {
-	    _tcscpy(SetBasic().FLARM_Traffic[flarm_slot].Name,fname);
-	  } else {
-	    SetBasic().FLARM_Traffic[flarm_slot].Name[0]=0;
-	  }
-	}
+        // if (Target currently without name)
+        if (!_tcslen(Basic().FLARM_Traffic[flarm_slot].Name)) {
+          // need to lookup name for this target
+	        const TCHAR *fname =
+              LookupFLARMDetails(Basic().FLARM_Traffic[flarm_slot].ID);
+
+          // if (name for FLARM id found)
+          if (fname) {
+            _tcscpy(SetBasic().FLARM_Traffic[flarm_slot].Name, fname);
+          } else {
+            SetBasic().FLARM_Traffic[flarm_slot].Name[0] = 0;
+          }
+        }
       }
     }
   }

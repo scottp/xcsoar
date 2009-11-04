@@ -58,7 +58,7 @@ GlideComputerStats::GlideComputerStats():
 
 void GlideComputerStats::ResetFlight(const bool full)
 {
-  FastLogNum = 0; 
+  FastLogNum = 0;
   if (full) {
     flightstats.Reset();
   }
@@ -68,9 +68,12 @@ void GlideComputerStats::StartTask() {
   flightstats.StartTask(Basic().Time);
 }
 
-
+/**
+ * Logs GPS fixes for snail trail and stats
+ * @return True if valid fix (fix distance <= 200m), False otherwise
+ */
 bool GlideComputerStats::DoLogging() {
-
+  // QUESTION TB: put that in seperate function?!
   // prevent bad fixes from being logged or added to OLC store
   if (Distance(Basic().Location, LastBasic().Location)>200.0) {
     return false;
@@ -127,8 +130,7 @@ bool GlideComputerStats::DoLogging() {
   return true;
 }
 
-
-double GlideComputerStats::GetAverageThermal() 
+double GlideComputerStats::GetAverageThermal()
 {
   double mc_current;
 
@@ -137,18 +139,15 @@ double GlideComputerStats::GetAverageThermal()
 					    Calculated().Circling);
 }
 
-
-
-void GlideComputerStats::SaveTaskSpeed(double val) 
+void GlideComputerStats::SaveTaskSpeed(double val)
 {
   flightstats.SaveTaskSpeed(val);
 }
 
-void GlideComputerStats::SetLegStart() 
+void GlideComputerStats::SetLegStart()
 {
   flightstats.SetLegStart(task.getActiveIndex(), Basic().Time);
 }
-
 
 void
 GlideComputerStats::OnClimbBase(double StartAlt)
@@ -157,7 +156,6 @@ GlideComputerStats::OnClimbBase(double StartAlt)
 			   - Calculated().TakeOffTime, StartAlt);
 }
 
-
 void
 GlideComputerStats::OnClimbCeiling()
 {
@@ -165,7 +163,6 @@ GlideComputerStats::OnClimbCeiling()
 			      -Calculated().TakeOffTime,
 			      Calculated().CruiseStartAlt);
 }
-
 
 void
 GlideComputerStats::OnDepartedThermal()

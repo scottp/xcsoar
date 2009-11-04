@@ -40,6 +40,10 @@ Copyright_License {
 
 #include "Screen/PaintWindow.hpp"
 
+#ifdef ENABLE_SDL
+#include <list>
+#endif /* !ENABLE_SDL */
+
 /**
  * A container for more #Window objects.  It is also derived from
  * #PaintWindow, because you might want to paint a border between the
@@ -47,24 +51,69 @@ Copyright_License {
  */
 class ContainerWindow : public PaintWindow {
 protected:
+#ifdef ENABLE_SDL
+  std::list<Window*> children;
+
+  /**
+   * The active child window is used to find the focused window.  If
+   * this attribute is NULL, then the focused window is not an
+   * (indirect) child window of this one.
+   */
+  Window *active_child;
+
+public:
+  ContainerWindow();
+#endif /* ENABLE_SDL */
+
+protected:
   virtual Brush *on_color(Window &window, Canvas &canvas);
 
-#ifndef ENABLE_SDL
+#ifdef ENABLE_SDL
+  virtual bool on_destroy();
+  virtual bool on_mouse_move(int x, int y, unsigned keys);
+  virtual bool on_mouse_down(int x, int y);
+  virtual bool on_mouse_up(int x, int y);
+  virtual bool on_mouse_double(int x, int y);
+  virtual void on_paint(Canvas &canvas);
+#else /* !ENABLE_SDL */
   virtual LRESULT on_message(HWND hWnd, UINT message,
                              WPARAM wParam, LPARAM lParam);
 #endif
 
 #ifdef ENABLE_SDL
 public:
-  void update_child(const Window &child) {
+  void add_child(Window &child) {
+    children.push_back(&child);
+  }
+
+  void remove_child(Window &child) {
+    children.remove(&child);
+
+    if (active_child == &child)
+      active_child = NULL;
+  }
+
+  /**
+   * Locate a child window by its relative coordinates.
+   */
+  Window *child_at(int x, int y);
+
+  void set_active_child(Window &child);
+
+  /**
+   * Override the Window::get_focused_window() method, and search in
+   * the active child window.
+   */
+  virtual Window *get_focused_window();
+
+  void expose_child(const Window &child) {
     canvas.copy(child.get_left(), child.get_top(),
                 child.get_canvas().get_width(),
                 child.get_canvas().get_height(),
                 child.get_canvas(), 0, 0);
-    canvas.update(child.get_left(), child.get_top(),
-                  canvas.get_width(), canvas.get_height());
+    expose(child.get_position());
   }
-#endif
+#endif /* ENABLE_SDL */
 };
 
 #endif

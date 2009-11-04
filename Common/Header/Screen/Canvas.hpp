@@ -84,6 +84,17 @@ public:
 
   void reset();
 
+protected:
+  /**
+   * Returns true if the outline should be drawn after the area has
+   * been filled.  As an optimization, this function returns false if
+   * brush and pen share the same color.
+   */
+  bool pen_over_brush() const {
+    return pen.defined() &&
+      (brush.is_hollow() || brush.get_color() != pen.get_color());
+  }
+
 public:
   bool defined() const {
     return surface != NULL;
@@ -158,7 +169,7 @@ public:
   void rectangle(int left, int top, int right, int bottom) {
     fill_rectangle(left, top, right, bottom, brush);
 
-    if (pen.get_width() > 0)
+    if (pen_over_brush())
       ::rectangleColor(surface, left, top, right, bottom,
                        pen.get_color().gfx_color());
   }
@@ -186,7 +197,15 @@ public:
   }
 
   void raised_edge(RECT &rc) {
-    rectangle(rc.left, rc.top, rc.right, rc.bottom); // XXX
+    Pen bright(1, Color(240, 240, 240));
+    select(bright);
+    two_lines(rc.left, rc.bottom - 2, rc.left, rc.top,
+              rc.right - 2, rc.top);
+
+    Pen dark(1, Color(128, 128, 128));
+    select(dark);
+    two_lines(rc.left + 1, rc.bottom - 1, rc.right - 1, rc.bottom - 1,
+              rc.right - 1, rc.top + 1);
 
     ++rc.left;
     ++rc.top;
@@ -206,6 +225,9 @@ public:
   }
 
   void polygon(const POINT* lppt, unsigned cPoints) {
+    if (brush.is_hollow() && !pen.defined())
+      return;
+
     Sint16 vx[cPoints], vy[cPoints];
 
     for (unsigned i = 0; i < cPoints; ++i) {
@@ -213,7 +235,12 @@ public:
       vy[i] = lppt[i].y;
     }
 
-    ::filledPolygonColor(surface, vx, vy, cPoints, pen.get_color().gfx_color());
+    if (!brush.is_hollow())
+      ::filledPolygonColor(surface, vx, vy, cPoints,
+                           brush.get_color().gfx_color());
+
+    if (pen_over_brush())
+      ::polygonColor(surface, vx, vy, cPoints, pen.get_color().gfx_color());
   }
 
   void clipped_polygon(const POINT* lppt, unsigned cPoints, const RECT rc,
@@ -268,7 +295,7 @@ public:
       ::filledCircleColor(surface, x, y, radius,
                           brush.get_color().gfx_color());
 
-    if (pen.get_width() > 0)
+    if (pen_over_brush())
       ::circleColor(surface, x, y, radius, pen.get_color().gfx_color());
   }
 
@@ -287,10 +314,7 @@ public:
   void segment(int x, int y, unsigned radius, const RECT rc,
                double start, double end, bool horizon=false);
 
-  void draw_button(RECT rc, bool down) {
-    // XXX
-    raised_edge(rc);
-  }
+  void draw_button(RECT rc, bool down);
 
   const SIZE text_size(const TCHAR *text, size_t length) const;
   const SIZE text_size(LPCTSTR text) const;
@@ -414,8 +438,18 @@ public:
               src, src_x, src_y, src_width, src_height);
   }
 
-  void update(Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
+  /**
+   * Makes sure the given area is updated on the screen.
+   */
+  void expose(Sint32 x, Sint32 y, Sint32 w, Sint32 h) {
     ::SDL_UpdateRect(surface, x, y, w, h);
+  }
+
+  /**
+   * Makes sure the whole area is updated on the screen.
+   */
+  void expose() {
+    expose(0, 0, 0, 0);
   }
 };
 

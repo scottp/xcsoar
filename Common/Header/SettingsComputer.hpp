@@ -68,11 +68,11 @@ typedef enum {
 
 typedef enum {
   ALLON=0,
-  CLIP, 
+  CLIP,
   AUTO,
-  ALLBELOW, 
-  INSIDE, 
-  ALLOFF 
+  ALLBELOW,
+  INSIDE,
+  ALLOFF
 } AirspaceDisplayMode_t;
 
 struct SETTINGS_COMPUTER {
@@ -92,6 +92,7 @@ struct SETTINGS_COMPUTER {
   double SAFETYALTITUDEARRIVAL;
   double SAFETYALTITUDEBREAKOFF;
   double SAFETYALTITUDETERRAIN;
+  /** ManoeuveringSpeed */
   double SAFTEYSPEED;
   int    EnableExternalTriggerCruise;
   short  AverEffTime;
@@ -101,11 +102,11 @@ struct SETTINGS_COMPUTER {
   // polar info
   int    BallastSecsToEmpty;
   bool   BallastTimerActive;
-  
+
   int    TeamCodeRefWaypoint;
   bool   TeamFlarmTracking;
   TCHAR  TeamFlarmCNTarget[4]; // CN of the glider to track
-  
+
   // sound stuff not used?
   bool   EnableSoundVario;
   bool   EnableSoundTask;
@@ -115,7 +116,7 @@ struct SETTINGS_COMPUTER {
 
   // local time adjustment
   int UTCOffset;
-  
+
   unsigned OLCRules;
   unsigned Handicap;
   bool EnableOLC;
@@ -127,8 +128,8 @@ struct SETTINGS_COMPUTER {
   int  Alternate1; // VENTA3
   int  Alternate2;
   int HomeWaypoint;
-/// vegavoice stuff
 
+  // vegavoice stuff
   bool EnableVoiceClimbRate;
   bool EnableVoiceTerrain;
   bool EnableVoiceWaypointDistance;
@@ -138,8 +139,8 @@ struct SETTINGS_COMPUTER {
   bool EnableVoiceInSector;
   bool EnableVoiceAirspace;
 
-  bool EnableAirspaceWarnings;
-  unsigned WarningTime;
+  bool EnableAirspaceWarnings; /* true if airspace warnings are enabled */
+  unsigned WarningTime; /** warning time before airspace entry */
   unsigned AcknowledgementTime;
 
   // airspace

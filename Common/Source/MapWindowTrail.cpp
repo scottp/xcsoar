@@ -55,6 +55,12 @@ Copyright_License {
 #include "Components.hpp"
 #include "options.h" /* for IBLSCALE() */
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+
 #define fSnailColour(cv) max(0,min((short)(NUMSNAILCOLORS-1), (short)((cv+1.0)/2.0*NUMSNAILCOLORS)))
 
 // This function is slow...
@@ -62,7 +68,7 @@ double MapWindow::DrawTrail(Canvas &canvas)
 {
   int i, snail_index;
   SNAIL_POINT P1;
-  POINT Screen; 
+  POINT Screen;
 
   double TrailFirstTime = -1;
 
@@ -234,7 +240,7 @@ double MapWindow::DrawTrail(Canvas &canvas)
     // now we know either point is visible, better get screen coords
     // if we don't already.
 
-    double dt = max(0,(display_time-P1.Time)*P1.DriftFactor);
+    double dt = max(0.0, (display_time - P1.Time) * P1.DriftFactor);
     double this_lon = P1.Longitude+traildrift.Longitude*dt;
     double this_lat = P1.Latitude+traildrift.Latitude*dt;
 
@@ -311,8 +317,8 @@ MapWindow::DrawTrailFromTask(Canvas &canvas, const double TrailFirstTime)
 {
   static POINT ptin[MAXCLIPPOLYGON];
 
-  if((SettingsMap().TrailActive!=3) 
-     || (DisplayMode == dmCircling) 
+  if((SettingsMap().TrailActive!=3)
+     || (DisplayMode == dmCircling)
      || (TrailFirstTime<0))
     return;
 
@@ -321,7 +327,7 @@ MapWindow::DrawTrailFromTask(Canvas &canvas, const double TrailFirstTime)
 
   glide_computer.GetOLC().Lock();
   glide_computer.GetOLC().SetLine();
-  int n = min(MAXCLIPPOLYGON, glide_computer.GetOLC().getN());
+  int n = min((int)MAXCLIPPOLYGON, glide_computer.GetOLC().getN());
   int i, j=0;
   for (i=0; i<n; i++) {
     if (glide_computer.GetOLC().getTime(i)>= mTrailFirstTime)

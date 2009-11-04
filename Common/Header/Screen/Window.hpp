@@ -66,6 +66,8 @@ protected:
   ContainerWindow *parent;
   int left, top;
   BufferCanvas canvas;
+
+  bool focused;
 #else
   HWND hWnd;
   WNDPROC prev_wndproc;
@@ -78,7 +80,7 @@ private:
 
 public:
 #ifdef ENABLE_SDL
-  Window():parent(NULL) {}
+  Window():parent(NULL), focused(false) {}
 #else
   Window():hWnd(NULL), prev_wndproc(NULL) {}
 #endif
@@ -102,12 +104,40 @@ public:
   }
 
 #ifdef ENABLE_SDL
+  void clear_parent() {
+    parent = NULL;
+  }
+
   int get_top() const {
     return top;
   }
 
   int get_left() const {
     return left;
+  }
+
+  unsigned get_width() const {
+    return canvas.get_width();
+  }
+
+  unsigned get_height() const {
+    return canvas.get_height();
+  }
+
+  int get_right() const {
+    return get_left() + get_width();
+  }
+
+  int get_bottom() const {
+    return get_top() + get_height();
+  }
+
+  int get_hmiddle() const {
+    return (get_left() + get_right()) / 2;
+  }
+
+  int get_vmiddle() const {
+    return (get_top() + get_bottom()) / 2;
   }
 
   const Canvas &get_canvas() const {
@@ -129,6 +159,12 @@ public:
 #endif
 
   void reset();
+
+  /**
+   * Determines the root owner window of this Window.  This is
+   * probably a pointer to the #MainWindow instance.
+   */
+  ContainerWindow *get_root_owner();
 
   void move(int left, int top) {
 #ifdef ENABLE_SDL
@@ -214,17 +250,22 @@ public:
 #endif
   }
 
-  void set_focus() {
 #ifdef ENABLE_SDL
-    // XXX
-#else
+
+  virtual Window *get_focused_window();
+  void set_focus();
+
+#else /* !ENABLE_SDL */
+
+  void set_focus() {
     ::SetFocus(hWnd);
-#endif
   }
+
+#endif /* !ENABLE_SDL */
 
   bool has_focus() const {
 #ifdef ENABLE_SDL
-    return true; // XXX
+    return focused;
 #else
     return hWnd == ::GetFocus();
 #endif
@@ -249,29 +290,12 @@ public:
 #ifndef ENABLE_SDL
   WNDPROC set_wndproc(WNDPROC wndproc)
   {
-    return (WNDPROC)::SetWindowLong(hWnd, GWL_WNDPROC, (LONG)wndproc);
-  }
-
-  void set_userdata(LONG value)
-  {
-    ::SetWindowLong(hWnd, GWL_USERDATA, value);
+    return (WNDPROC)::SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)wndproc);
   }
 
   void set_userdata(void *value)
   {
-    // XXX on 64 bit machines?
-    set_userdata((LONG)(size_t)value);
-  }
-
-  LONG get_userdata() const
-  {
-    return ::GetWindowLong(hWnd, GWL_USERDATA);
-  }
-
-  void *get_userdata_pointer() const
-  {
-    // XXX on 64 bit machines?
-    return (void *)get_userdata();
+    ::SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)value);
   }
 #endif /* !ENABLE_SDL */
 
@@ -298,7 +322,10 @@ public:
   {
     RECT rc;
 #ifdef ENABLE_SDL
-    // XXX
+    rc.left = get_left();
+    rc.top = get_top();
+    rc.right = get_width();
+    rc.bottom = get_height();
 #else
     ::GetWindowRect(hWnd, &rc);
 #endif
@@ -309,21 +336,39 @@ public:
   {
     RECT rc;
 #ifdef ENABLE_SDL
-    // XXX
+    rc.left = 0;
+    rc.top = 0;
+    rc.right = get_width();
+    rc.bottom = get_height();
 #else
     ::GetClientRect(hWnd, &rc);
 #endif
     return rc;
   }
 
-#ifndef ENABLE_SDL
-  static LONG get_userdata(HWND hWnd) {
-    return ::GetWindowLong(hWnd, GWL_USERDATA);
+#ifdef ENABLE_SDL
+  void paint() {
+    on_paint(canvas);
   }
 
-  static void *get_userdata_pointer(HWND hWnd) {
-    // XXX on 64 bit machines?
-    return (void *)get_userdata(hWnd);
+  /**
+   * Ensures that the specified rectangle is updated on the physical
+   * screen.
+   */
+  virtual void expose(const RECT &rect);
+
+  /**
+   * Ensures that the window is updated on the physical screen.
+   */
+  virtual void expose();
+#else /* !ENABLE_SDL */
+  void expose(const RECT &rect) {}
+  void expose() {}
+#endif /* !ENABLE_SDL */
+
+#ifndef ENABLE_SDL
+  static void *get_userdata(HWND hWnd) {
+    return (void *)::GetWindowLongPtr(hWnd, GWLP_USERDATA);
   }
 
   /**
@@ -331,7 +376,7 @@ public:
    * is legal.
    */
   static Window *get_unchecked(HWND hWnd) {
-    return (Window *)get_userdata_pointer(hWnd);
+    return (Window *)get_userdata(hWnd);
   }
 
   /**
@@ -340,7 +385,7 @@ public:
    * have called install_wndproc().
    */
   static Window *get(HWND hWnd) {
-    WNDPROC wndproc = (WNDPROC)::GetWindowLong(hWnd, GWL_WNDPROC);
+    WNDPROC wndproc = (WNDPROC)::GetWindowLongPtr(hWnd, GWLP_WNDPROC);
     return wndproc == WndProc
       ? get_unchecked(hWnd)
       : NULL;
@@ -370,6 +415,9 @@ public:
   }
 
 protected:
+#ifdef ENABLE_SDL
+public:
+#endif /* ENABLE_SDL */
   /**
    * @return true on success, false if the window should not be
    * created
@@ -385,14 +433,18 @@ protected:
   virtual bool on_mouse_double(int x, int y);
   virtual bool on_key_down(unsigned key_code);
   virtual bool on_key_up(unsigned key_code);
-  virtual bool on_command(HWND hWnd, unsigned id, unsigned code);
+  virtual bool on_command(unsigned id, unsigned code);
   virtual bool on_setfocus();
   virtual bool on_killfocus();
   virtual bool on_timer(timer_t id);
   virtual bool on_user(unsigned id);
 
+#ifdef ENABLE_SDL
+  virtual void on_paint(Canvas &canvas);
 
-#ifndef ENABLE_SDL
+  virtual bool on_event(const SDL_Event &event);
+
+#else /* !ENABLE_SDL */
   /**
    * Called by on_message() when the message was not handled by any
    * virtual method.  Calls the default handler.  This function is

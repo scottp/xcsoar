@@ -55,6 +55,12 @@ Copyright_License {
 
 #include <math.h>
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+
 static WndForm *wf=NULL;
 static WindowControl *btnMove = NULL;
 static unsigned ActiveTaskPointOnEntry = 0;
@@ -93,16 +99,16 @@ static void MoveTarget(double adjust_angle) {
   }
 
   // JMW illegal
-  bearing = AngleLimit360(XCSoarInterface::main_window.map.GetDisplayAngle() 
+  bearing = AngleLimit360(XCSoarInterface::main_window.map.GetDisplayAngle()
                           + adjust_angle);
 
   FindLatitudeLongitude (tp.AATTargetLocation,
                          bearing, distance,
                          &target_location);
 
-  if (task.InAATTurnSector(target_location, 
+  if (task.InAATTurnSector(target_location,
                            target_point)) {
-    if (XCSoarInterface::Calculated().IsInSector 
+    if (XCSoarInterface::Calculated().IsInSector
         && (target_point == task.getActiveIndex())) {
       // set range/radial for inside sector
       double course_bearing, target_bearing;
@@ -166,9 +172,9 @@ static void DragTarget(const GEOPOINT target_location) {
   double distance, bearing;
   TASK_POINT tp = task.getTaskPoint(target_point);
 
-  if (task.InAATTurnSector(target_location, 
+  if (task.InAATTurnSector(target_location,
                            target_point)) {
-    if (XCSoarInterface::Calculated().IsInSector 
+    if (XCSoarInterface::Calculated().IsInSector
         && (target_point == task.getActiveIndex())) {
       // set range/radial for inside sector
       double course_bearing, target_bearing;
@@ -449,7 +455,7 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
       TASK_POINT tp = task.getTaskPoint(target_point);
 
       if (target_point>=task.getActiveIndex()) {
-        if (!XCSoarInterface::Calculated().IsInSector 
+        if (!XCSoarInterface::Calculated().IsInSector
             || (target_point != task.getActiveIndex())) {
           dowrap = true;
         }
@@ -462,7 +468,7 @@ static void OnRadialData(DataField *Sender, DataField::DataAccessKind_t Mode) {
             tp.AATTargetOffsetRadius= -tp.AATTargetOffsetRadius;
             updated = true;
           } else {
-            RadialNew = max(-90,min(90,RadialNew));
+            RadialNew = max(-90.0, min(90.0, RadialNew));
             updated = true;
           }
         }

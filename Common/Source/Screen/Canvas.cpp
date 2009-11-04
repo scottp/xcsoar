@@ -82,15 +82,47 @@ Canvas::arc(int x, int y, unsigned radius, const RECT rc,
             double start, double end)
 {
   // XXX
-  ::pieColor(surface, x, y, radius, start, end, brush.get_color().gfx_color());
+  ::pieColor(surface, x, y, radius, start - 90, end - 90,
+             brush.get_color().gfx_color());
 }
 
 void
 Canvas::segment(int x, int y, unsigned radius, const RECT rc,
                 double start, double end, bool horizon)
 {
-  // XXX
-  ::pieColor(surface, x, y, radius, start, end, brush.get_color().gfx_color());
+  // XXX horizon
+
+  if (!brush.is_hollow())
+    ::filledPieColor(surface, x, y, radius, (int)start - 90, (int)end - 90,
+                     brush.get_color().gfx_color());
+
+  if (pen_over_brush())
+    ::pieColor(surface, x, y, radius, (int)start - 90, (int)end - 90,
+               pen.get_color().gfx_color());
+}
+
+void
+Canvas::draw_button(RECT rc, bool down)
+{
+  Brush gray(Color(192, 192, 192));
+  fill_rectangle(rc, gray);
+
+  Pen bright(1, Color(240, 240, 240));
+  Pen dark(1, Color(128, 128, 128));
+
+  select(down ? dark : bright);
+  two_lines(rc.left, rc.bottom - 2, rc.left, rc.top,
+            rc.right - 2, rc.top);
+  two_lines(rc.left + 1, rc.bottom - 3, rc.left + 1, rc.top + 1,
+            rc.right - 3, rc.top + 1);
+
+  select(down ? bright : dark);
+  two_lines(rc.left + 1, rc.bottom - 1, rc.right - 1, rc.bottom - 1,
+            rc.right - 1, rc.top + 1);
+  two_lines(rc.left + 2, rc.bottom - 2, rc.right - 2, rc.bottom - 2,
+            rc.right - 2, rc.top + 2);
+
+  white_pen();
 }
 
 const SIZE
@@ -444,7 +476,7 @@ Canvas::stretch_and(int dest_x, int dest_y,
 
 #else /* !ENABLE_SDL */
 
-// TODO: ClipPolygon is not thread safe (uses a static array)!  
+// TODO: ClipPolygon is not thread safe (uses a static array)!
 // We need to make it so.
 
 void

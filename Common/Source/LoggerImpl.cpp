@@ -37,7 +37,7 @@
 
 #include "LoggerImpl.hpp"
 #include "Version.hpp"
-#include "Dialogs.h"
+#include "Dialogs/Message.hpp"
 #include "Language.hpp"
 #include "Task.h"
 #include "Registry.hpp"
@@ -78,6 +78,10 @@ TCHAR NumToIGCChar(int n)  {
   }
 }
 
+/**
+ * Returns whether a task is declared to the device
+ * @return True if a task is declared to the device, False otherwise
+ */
 bool
 LoggerImpl::isTaskDeclared() const {
   return DeclaredToDevice;
@@ -93,41 +97,39 @@ int IGCCharToNum(TCHAR c)  {
   }
 }
 
-
 /*
 
-HFDTE141203  <- should be UTC, same as time in filename
-HFFXA100
-HFPLTPILOT:JOHN WHARINGTON
-HFGTYGLIDERTYPE:LS 3
-HFGIDGLIDERID:VH-WUE
-HFDTM100GPSDATUM:WGS84
-HFRFWFIRMWAREVERSION:3.6
-HFRHWHARDWAREVERSION:3.4
-HFFTYFR TYPE:GARRECHT INGENIEURGESELLSCHAFT,VOLKSLOGGER 1.0
-HFCIDCOMPETITIONID:WUE
-HFCCLCOMPETITIONCLASS:FAI
-HFCIDCOMPETITIONID:WUE
-HFCCLCOMPETITIONCLASS:15M
-*/
+ HFDTE141203  <- should be UTC, same as time in filename
+ HFFXA100
+ HFPLTPILOT:JOHN WHARINGTON
+ HFGTYGLIDERTYPE:LS 3
+ HFGIDGLIDERID:VH-WUE
+ HFDTM100GPSDATUM:WGS84
+ HFRFWFIRMWAREVERSION:3.6
+ HFRHWHARDWAREVERSION:3.4
+ HFFTYFR TYPE:GARRECHT INGENIEURGESELLSCHAFT,VOLKSLOGGER 1.0
+ HFCIDCOMPETITIONID:WUE
+ HFCCLCOMPETITIONCLASS:FAI
+ HFCIDCOMPETITIONID:WUE
+ HFCCLCOMPETITIONCLASS:15M
+ */
 
-
-void 
+void
 LoggerImpl::SetFRecordLastTime(double dTime)
 { FRecordLastTime=dTime; }
 
-double 
+double
 LoggerImpl::GetFRecordLastTime(void)
 { return FRecordLastTime; }
 
-void 
+void
 LoggerImpl::ResetFRecord_Internal(void)
 {
   for (int iFirst = 0; iFirst < MAX_IGC_BUFF; iFirst++)
     szLastFRecord[iFirst]=0;
 }
 
-void 
+void
 LoggerImpl::ResetFRecord(void)
 {
   SetFRecordLastTime(0);
@@ -135,7 +137,7 @@ LoggerImpl::ResetFRecord(void)
 }
 
 
-void 
+void
 LoggerImpl::StopLogger(const NMEA_INFO &gps_info) {
   TCHAR szMessage[MAX_PATH] = TEXT("\0");
   int iLoggerError=0;  // see switch statement for error handler
@@ -160,14 +162,14 @@ LoggerImpl::StopLogger(const NMEA_INFO &gps_info) {
         Sleep(750); // wait for file system cache to fix itself?
       }
       if (imCount == imMax) { // MoveFile() failed all attempts
-      
+
         if (0 == MoveFile( szLoggerFileName, szFLoggerFileNameRoot)) { // try rename it and leave in root
           iLoggerError=1; //Fail.  NoMoveNoRename
         }
         else {
           iLoggerError=2; //NoMoveYesRename
         }
-      }      
+      }
     } else { // Insufficient disk space.  // MoveFile() nonzero==Success
       if (0 == MoveFile( szLoggerFileName, szFLoggerFileNameRoot)) { // try rename it and leave in root
         iLoggerError=3; //Fail.  Insufficient Disk Space, NoRename
@@ -176,7 +178,7 @@ LoggerImpl::StopLogger(const NMEA_INFO &gps_info) {
         iLoggerError=4; //Success.  Insufficient Disk Space, YesRename
       }
     }
-    
+
     switch (iLoggerError) { //0=Success 1=NoMoveNoRename 2=NoMoveYesRename 3=NoSpaceNoRename 4=NoSpaceYesRename
     case 0:
       StartupStore(TEXT("Logger file successfully moved\r\n"));
@@ -261,7 +263,7 @@ LoggerImpl::LogPointToBuffer(const NMEA_INFO &gps_info)
 }
 
 
-void 
+void
 LoggerImpl::LogPointToFile(const NMEA_INFO& gps_info)
 {
   char szBRecord[500];
@@ -303,8 +305,8 @@ LoggerImpl::LogPointToFile(const NMEA_INFO& gps_info)
 }
 
 
-void 
-LoggerImpl::LogPoint(const NMEA_INFO& gps_info) 
+void
+LoggerImpl::LogPoint(const NMEA_INFO& gps_info)
 {
   if (!LoggerActive) {
     if (!gps_info.NAVWarning) {
@@ -333,7 +335,7 @@ LoggerImpl::LogPoint(const NMEA_INFO& gps_info)
 
       for (int iSat=0; iSat < MAXSATELLITES; iSat++)
 	tmp_info.SatelliteIDs[iSat] = LoggerBuffer[i].SatelliteIDs[iSat];
-    
+
       LogPointToFile(tmp_info);
     }
     NumLoggerBuffered = 0;
@@ -344,7 +346,7 @@ LoggerImpl::LogPoint(const NMEA_INFO& gps_info)
 }
 
 bool
-LoggerImpl::LogFRecordToFile(const int SatelliteIDs[], 
+LoggerImpl::LogFRecordToFile(const int SatelliteIDs[],
                          short Hour, short Minute,
                          short Second, bool bAlways)
 { // bAlways forces write when completing header for restart
@@ -422,8 +424,8 @@ LoggerImpl::LogFRecord(const NMEA_INFO &gps_info, bool bAlways)
   if (LoggerActive || bAlways)
     {
       return LogFRecordToFile(gps_info.SatelliteIDs,
-			      gps_info.Hour, 
-			      gps_info.Minute, 
+			      gps_info.Hour,
+			      gps_info.Minute,
 			      gps_info.Second, bAlways);
     }
   else
@@ -440,8 +442,8 @@ bool IsAlphaNum (TCHAR c) {
   }
 }
 
-void 
-LoggerImpl::StartLogger(const NMEA_INFO &gps_info, 
+void
+LoggerImpl::StartLogger(const NMEA_INFO &gps_info,
                     const SETTINGS_COMPUTER &settings,
                     const TCHAR *astrAssetNumber)
 {
@@ -555,7 +557,7 @@ LoggerImpl::StartLogger(const NMEA_INFO &gps_info,
 }
 
 
-void 
+void
 LoggerImpl::LoggerHeader(const NMEA_INFO &gps_info)
 {
   char datum[]= "HFDTM100Datum: WGS-84\r\n";
@@ -598,7 +600,7 @@ LoggerImpl::LoggerHeader(const NMEA_INFO &gps_info)
 }
 
 
-void 
+void
 LoggerImpl::StartDeclaration(const NMEA_INFO &gps_info,
                          const int ntp)
 {
@@ -640,7 +642,7 @@ LoggerImpl::StartDeclaration(const NMEA_INFO &gps_info,
 }
 
 
-void 
+void
 LoggerImpl::EndDeclaration(void)
 {
   // TODO bug: this is causing problems with some analysis software
@@ -649,7 +651,7 @@ LoggerImpl::EndDeclaration(void)
   IGCWriteRecord(start, szLoggerFileName);
 }
 
-void 
+void
 LoggerImpl::AddDeclaration(double Latitude, double Longitude, const TCHAR *ID)
 {
   char szCRecord[500];
@@ -698,11 +700,10 @@ LoggerImpl::AddDeclaration(double Latitude, double Longitude, const TCHAR *ID)
   IGCWriteRecord(szCRecord, szLoggerFileName);
 }
 
-
 // TODO code: make this thread-safe, since it could happen in the middle
 // of the calculations doing LogPoint or something else!
 
-void 
+void
 LoggerImpl::LoggerNote(const TCHAR *text) {
   if (LoggerActive) {
     char fulltext[500];
@@ -732,7 +733,7 @@ bool LoggerImpl::LoggerDeclare(PDeviceDescriptor_t dev, Declaration_t *decl)
   return TRUE;
 }
 
-void 
+void
 LoggerImpl::LoggerDeviceDeclare() {
   bool found_logger = false;
   Declaration_t Decl;
@@ -763,12 +764,19 @@ LoggerImpl::LoggerDeviceDeclare() {
 
 }
 
-
-bool 
-LoggerImpl::CheckDeclaration(void) 
+/**
+ * Checks whether a Task is declared to the Logger.
+ * If so, asks whether to invalidate the declaration.
+ * @return True if a Task is NOT declared to the Logger, False otherwise
+ */
+bool
+LoggerImpl::CheckDeclaration(void)
 {
+  // if (Task is not declared)
   if (!isTaskDeclared()) {
     return true;
+
+  // else (Task is declared)
   } else {
     if(MessageBoxX(gettext(TEXT("OK to invalidate declaration?")),
 		   gettext(TEXT("Task declared")),
@@ -780,10 +788,6 @@ LoggerImpl::CheckDeclaration(void)
     }
   }
 }
-
-
-//////
-
 
 FILETIME LogFileDate(const NMEA_INFO &gps_info,
 		     TCHAR* filename) {
@@ -908,7 +912,6 @@ bool DeleteOldIGCFile(const NMEA_INFO &gps_info,
   return true; // did delete one
 }
 
-
 #define LOGGER_MINFREESTORAGE (250+MINFREESTORAGE)
 // JMW note: we want to clear up enough space to save the persistent
 // data (85 kb approx) and a new log file
@@ -923,8 +926,8 @@ TCHAR testtext6[] = TEXT("9BDX7B31.IGC");
 TCHAR testtext7[] = TEXT("2008-01-05-XXX-AAA-01.IGC");
 #endif
 
-bool 
-LoggerImpl::LoggerClearFreeSpace(const NMEA_INFO &gps_info) 
+bool
+LoggerImpl::LoggerClearFreeSpace(const NMEA_INFO &gps_info)
 {
   bool found = true;
   unsigned long kbfree=0;
@@ -972,15 +975,12 @@ LoggerImpl::LoggerClearFreeSpace(const NMEA_INFO &gps_info)
   }
 }
 
-
-
-
 #include "Interface.hpp"
 
 // TODO: fix scope so only gui things can start it
 
-void 
-LoggerImpl::guiStartLogger(const NMEA_INFO& gps_info, 
+void
+LoggerImpl::guiStartLogger(const NMEA_INFO& gps_info,
                        const SETTINGS_COMPUTER& settings,
                        bool noAsk) {
   int i;
@@ -1038,8 +1038,8 @@ LoggerImpl::guiStartLogger(const NMEA_INFO& gps_info,
 }
 
 
-void 
-LoggerImpl::guiStopLogger(const NMEA_INFO& gps_info, 
+void
+LoggerImpl::guiStopLogger(const NMEA_INFO& gps_info,
                       bool noAsk) {
   if (LoggerActive) {
     if(noAsk ||
@@ -1052,8 +1052,8 @@ LoggerImpl::guiStopLogger(const NMEA_INFO& gps_info,
 }
 
 
-void 
-LoggerImpl::guiToggleLogger(const NMEA_INFO& gps_info, 
+void
+LoggerImpl::guiToggleLogger(const NMEA_INFO& gps_info,
                         const SETTINGS_COMPUTER& settings,
                         bool noAsk) {
   if (LoggerActive) {
@@ -1064,8 +1064,8 @@ LoggerImpl::guiToggleLogger(const NMEA_INFO& gps_info,
 }
 
 
-void 
-LoggerImpl::clearBuffer() 
+void
+LoggerImpl::clearBuffer()
 {
   NumLoggerBuffered = 0;
 }

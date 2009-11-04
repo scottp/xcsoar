@@ -42,7 +42,7 @@ Copyright_License {
 #include "SettingsComputerBlackboard.hpp"
 #include "MapProjectionBlackboard.hpp"
 
-class GlideComputerBlackboard: 
+class GlideComputerBlackboard:
   public BaseBlackboard,
   public SettingsComputerBlackboard,
   public MapProjectionBlackboard
@@ -56,6 +56,9 @@ protected:
   bool time_advanced() {
     return (Basic().Time-LastBasic().Time>0);
   }
+  /**
+   * @see GlideComputerBlackboard::ReadBlackboard()
+   */
   bool time_retreated() {
     return _time_retreated;
   }

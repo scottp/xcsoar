@@ -40,8 +40,8 @@ Copyright_License {
 #ifdef ENABLE_SDL
 #include <wcecompat/ts_string.h>
 #else /* !ENABLE_SDL */
-#if defined(GNAV) && !defined(PCGNAV)
 #include "Interface.hpp" /* for XCSoarInterface::hInst */
+#if defined(GNAV) && !defined(PCGNAV)
 #include "resource.h" /* for IDI_XCSOARSWIFT */
 #endif
 #endif /* !ENABLE_SDL */
@@ -99,8 +99,7 @@ TopWindow::set(LPCTSTR cls, LPCTSTR text,
     fprintf(stderr, "TTF_Init() has failed: %s\n", TTF_GetError());
 
   screen.set();
-  ContainerWindow::set(NULL, NULL, NULL,
-                       0, 0, width, height);
+  ContainerWindow::set(NULL, 0, 0, width, height);
 
   char text2[512];
   unicode2ascii(text, text2);
@@ -143,6 +142,24 @@ TopWindow::full_screen()
 #endif /* !ENABLE_SDL */
 }
 
+#ifdef ENABLE_SDL
+
+void
+TopWindow::expose(const RECT &rect) {
+  ContainerWindow::expose(rect);
+  screen.copy(canvas);
+  screen.expose();
+}
+
+void
+TopWindow::expose() {
+  ContainerWindow::expose();
+  screen.copy(canvas);
+  screen.expose();
+}
+
+#endif /* ENABLE_SDL */
+
 bool
 TopWindow::on_activate()
 {
@@ -155,7 +172,28 @@ TopWindow::on_deactivate()
   return false;
 }
 
-#ifndef ENABLE_SDL
+#ifdef ENABLE_SDL
+
+bool
+TopWindow::on_event(const SDL_Event &event)
+{
+  switch (event.type) {
+  case SDL_MOUSEMOTION:
+    // XXX keys
+    return on_mouse_move(event.motion.x, event.motion.y, 0);
+
+  case SDL_MOUSEBUTTONDOWN:
+    return on_mouse_down(event.button.x, event.button.y);
+
+  case SDL_MOUSEBUTTONUP:
+    return on_mouse_up(event.button.x, event.button.y);
+  }
+
+  return false;
+}
+
+#else /* !ENABLE_SDL */
+
 LRESULT TopWindow::on_message(HWND _hWnd, UINT message,
 			       WPARAM wParam, LPARAM lParam) {
   switch (message) {
@@ -177,3 +215,45 @@ LRESULT TopWindow::on_message(HWND _hWnd, UINT message,
   return ContainerWindow::on_message(_hWnd, message, wParam, lParam);
 }
 #endif /* !ENABLE_SDL */
+
+int
+TopWindow::event_loop(unsigned accelerators_id)
+{
+#ifdef ENABLE_SDL
+  SDL_Event event;
+
+  update();
+
+  while (SDL_WaitEvent(&event)) {
+    if (event.type == SDL_QUIT)
+      break;
+
+    if (event.type >= SDL_USEREVENT && event.type <= SDL_NUMEVENTS-1 &&
+        event.user.data1 != NULL) {
+      Window *window = (Window *)event.user.data1;
+      window->on_user(event.type - SDL_USEREVENT);
+    } else
+      on_event(event);
+  }
+
+  return 0;
+
+#else /* !ENABLE_SDL */
+
+  HACCEL hAccelerators = accelerators_id != 0
+    ? ::LoadAccelerators(XCSoarInterface::hInst,
+                         MAKEINTRESOURCE(accelerators_id))
+    : NULL;
+
+  MSG msg;
+  while (::GetMessage(&msg, NULL, 0, 0)) {
+    if (hAccelerators == NULL ||
+        !::TranslateAccelerator(msg.hwnd, hAccelerators, &msg)) {
+      ::TranslateMessage(&msg);
+      ::DispatchMessage(&msg);
+    }
+  }
+
+  return msg.wParam;
+#endif /* !ENABLE_SDL */
+}

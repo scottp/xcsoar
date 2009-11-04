@@ -61,6 +61,12 @@ Copyright_License {
 #endif
 #include <stdlib.h>
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+
 /////////////////////////////////////////
 
 
@@ -89,11 +95,11 @@ int MapWindow::ProcessVirtualKey(int X, int Y, long keytime, short vkmode) {
 	   X,Y,keytime);
   DoStatusMessage(buf);
 #endif
-  
+
   short sizeup=MapRect.bottom-MapRect.top;
   short yup=(sizeup/3)+MapRect.top;
   short ydown=MapRect.bottom-(sizeup/3);
-  
+
   if (Y<yup) {
     if (keytime>=VKTIMELONG)
       return 0xc1;
@@ -104,7 +110,7 @@ int MapWindow::ProcessVirtualKey(int X, int Y, long keytime, short vkmode) {
     if (keytime>=VKTIMELONG)
       return 0xc2;
     else
-      
+
       return 40;
   }
 
@@ -193,7 +199,8 @@ bool MapWindow::on_mouse_double(int x, int y)
   return true;
 }
 
-bool MapWindow::on_mouse_move(int x, int y)
+bool
+MapWindow::on_mouse_move(int x, int y, unsigned keys)
 {
   if (task.getSettings().AATEnabled && SettingsMap().TargetPan && (TargetDrag_State>0)) {
     // target follows "finger" so easier to drop near edge of
@@ -212,10 +219,12 @@ bool MapWindow::on_mouse_move(int x, int y)
 	TargetDrag_Location = mouseMove;
 
 	draw_masked_bitmap(get_canvas(), MapGfx.hBmpTarget, x, y, 10, 10, true);
+        return true;
       }
     }
   }
-  return true;
+
+  return MaskedPaintWindow::on_mouse_move(x, y, keys);
 }
 
 bool MapWindow::on_mouse_down(int x, int y)
@@ -242,7 +251,7 @@ bool MapWindow::on_mouse_down(int x, int y)
 			       (YstartScreen-tscreen.y)
 			       *(YstartScreen-tscreen.y)))
 	/InfoBoxLayout::scale;
-      
+
       if (distance<10) {
 	TargetDrag_State = 1;
       }
@@ -290,9 +299,9 @@ bool MapWindow::on_mouse_up(int x, int y)
 
   // Caution, timed clicks from PC with a mouse are different
   // from real touchscreen devices
-  
-  if ((distance<50) 
-       && (CommonInterface::VirtualKeys==(VirtualKeys_t)vkEnabled) 
+
+  if ((distance<50)
+       && (CommonInterface::VirtualKeys==(VirtualKeys_t)vkEnabled)
        && (dwInterval>= DOUBLECLICKINTERVAL)) {
     unsigned wParam=ProcessVirtualKey(x,y,dwInterval,0);
     if (wParam==0) {
@@ -317,7 +326,7 @@ bool MapWindow::on_mouse_up(int x, int y)
     }
     return true;
   }
- 
+
   if (!my_target_pan && SettingsMap().EnablePan && (distance>IBLSCALE(36))) {
     // JMW broken!
     PanLocation.Longitude += LLstart.Longitude-G.Longitude;
@@ -340,7 +349,7 @@ bool MapWindow::on_mouse_up(int x, int y)
     device_blackboard.SetTrackBearing(newbearing);
     // change bearing without changing speed if direction change > 30
     // 20080815 JMW prevent dragging to stop glider
-    
+
     // JMW trigger recalcs immediately
     TriggerGPSUpdate();
     return true;
@@ -383,7 +392,7 @@ bool MapWindow::on_key_down(unsigned key_code)
 {
   // VENTA-TODO careful here, keyup no more trapped for PNA.
   // Forbidden usage of keypress timing.
-  
+
   key_code = TranscodeKey(key_code);
 #if defined(GNAV)
   if (key_code == 0xF5){

@@ -88,6 +88,7 @@ DEVS	:=\
 
 DLGS	:=\
 	$(SRC)/Dialogs/XML.o \
+	$(SRC)/Dialogs/Message.o \
 	$(SRC)/Dialogs/dlgAirspace.o \
 	$(SRC)/Dialogs/dlgAirspaceColours.o \
 	$(SRC)/Dialogs/dlgAirspaceDetails.o \
@@ -295,6 +296,7 @@ OBJS	:=\
 	\
 	$(SRC)/Screen/Animation.o 	\
 	$(SRC)/Screen/Blank.o 		\
+	$(SRC)/Screen/ButtonWindow.o \
 	$(SRC)/Screen/Chart.o 		\
 	$(SRC)/Screen/Fonts.o 		\
 	$(SRC)/Screen/Graphics.o 	\

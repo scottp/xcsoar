@@ -83,6 +83,14 @@ class MapWindow
 
   static bool register_class(HINSTANCE hInstance);
 
+#ifdef WIN32
+  /**
+   * Identifies the HWND: if the handle is a MapWindow instance, this
+   * function returns true.
+   */
+  static bool identify(HWND hWnd);
+#endif
+
   void set(ContainerWindow &parent,
            const RECT _MapRectSmall, const RECT _MapRectBig);
 
@@ -99,8 +107,6 @@ class MapWindow
 
   // input events or reused code
   void ExchangeBlackboard();
-
-  ////////////////////////////////////////////////////////////////////
 
  private:
 
@@ -219,7 +225,7 @@ class MapWindow
   virtual bool on_destroy();
   virtual bool on_resize(unsigned width, unsigned height);
   virtual bool on_mouse_double(int x, int y);
-  virtual bool on_mouse_move(int x, int y);
+  virtual bool on_mouse_move(int x, int y, unsigned keys);
   virtual bool on_mouse_down(int x, int y);
   virtual bool on_mouse_up(int x, int y);
   virtual bool on_key_down(unsigned key_code);

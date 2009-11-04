@@ -36,6 +36,7 @@ Copyright_License {
 */
 
 #include "Dialogs/Internal.hpp"
+#include "Dialogs/Message.hpp"
 #include "Blackboard.hpp"
 #include "InfoBoxLayout.h"
 #include "Airspace.h"
@@ -69,14 +70,14 @@ static void OnAcknowledgeClicked(WindowControl * Sender){
 			 MB_YESNOCANCEL|MB_ICONQUESTION);
     if (answer == IDYES) {
       if (index_circle>=0) {
-	AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
-                            &XCSoarInterface::Calculated(), 
+	AirspaceWarnListAdd(&XCSoarInterface::Basic(),
+                            &XCSoarInterface::Calculated(),
                             &XCSoarInterface::SettingsComputer(),
                             XCSoarInterface::MapProjection(),
                             false, true, index_circle, true);
       } else if (index_area>=0) {
-	AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
-                            &XCSoarInterface::Calculated(), 
+	AirspaceWarnListAdd(&XCSoarInterface::Basic(),
+                            &XCSoarInterface::Calculated(),
                             &XCSoarInterface::SettingsComputer(),
                             XCSoarInterface::MapProjection(),
                             false, false, index_area, true);
@@ -85,14 +86,14 @@ static void OnAcknowledgeClicked(WindowControl * Sender){
     } else if (answer == IDNO) {
       // this will cancel a daily ack
       if (index_circle>=0) {
-	AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
-                            &XCSoarInterface::Calculated(), 
+	AirspaceWarnListAdd(&XCSoarInterface::Basic(),
+                            &XCSoarInterface::Calculated(),
                             &XCSoarInterface::SettingsComputer(),
                             XCSoarInterface::MapProjection(),
                             true, true, index_circle, true);
       } else if (index_area>=0) {
-	AirspaceWarnListAdd(&XCSoarInterface::Basic(), 
-                            &XCSoarInterface::Calculated(), 
+	AirspaceWarnListAdd(&XCSoarInterface::Basic(),
+                            &XCSoarInterface::Calculated(),
                             &XCSoarInterface::SettingsComputer(),
                             XCSoarInterface::MapProjection(),
                             true, false, index_area, true);
@@ -138,9 +139,9 @@ static void SetValues(void) {
     top = &AirspaceArea[index_area].Top;
     base = &AirspaceArea[index_area].Base;
     name = AirspaceArea[index_area].Name;
-    inside = InsideAirspaceArea(XCSoarInterface::Basic().Location, 
+    inside = InsideAirspaceArea(XCSoarInterface::Basic().Location,
 				index_area);
-    range = RangeAirspaceArea(XCSoarInterface::Basic().Location, 
+    range = RangeAirspaceArea(XCSoarInterface::Basic().Location,
                               index_area, &bearing,
                               map_window);
   }
@@ -149,10 +150,10 @@ static void SetValues(void) {
     top = &AirspaceCircle[index_circle].Top;
     base = &AirspaceCircle[index_circle].Base;
     name = AirspaceCircle[index_circle].Name;
-    inside = InsideAirspaceCircle(XCSoarInterface::Basic().Location, 
+    inside = InsideAirspaceCircle(XCSoarInterface::Basic().Location,
 				  index_circle);
     range =
-      RangeAirspaceCircle(XCSoarInterface::Basic().Location, 
+      RangeAirspaceCircle(XCSoarInterface::Basic().Location,
 			  index_circle);
 
     DistanceBearing(XCSoarInterface::Basic().Location,

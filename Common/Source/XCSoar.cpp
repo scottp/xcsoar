@@ -35,6 +35,11 @@ Copyright_License {
 }
 */
 
+/**
+ * This is the main entry point for the application
+ * @file XCSoar.cpp
+ */
+
 #include "XCSoar.h"
 #include "Version.hpp"
 #include "Protection.hpp"
@@ -42,7 +47,6 @@ Copyright_License {
 #include "LogFile.hpp"
 #include "UtilsSystem.hpp"
 #include "MainWindow.hpp"
-#include "Message.h"
 #include "Asset.hpp"
 #include "Interface.hpp"
 
@@ -55,24 +59,9 @@ Copyright_License {
 #endif
 #endif /* !ENABLE_SDL */
 
-///////////////////////////////////////////////////////////////////////////////
-
-// Main message loop
-WPARAM WindowsMessageLoop(HINSTANCE hInstance) 
-{
-  HACCEL hAccelTable = LoadAccelerators(hInstance, (LPCTSTR)IDC_XCSOAR);
-  MSG msg;
-  while (GetMessage(&msg, NULL, 0, 0)) {
-    if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-    }
-  }
-  return msg.wParam;
-}
-
-
-
+/**
+ * Main entry point for the whole XCSoar application
+ */
 int WINAPI WinMain(     HINSTANCE hInstance,
                         HINSTANCE hPrevInstance,
                         LPTSTR    lpCmdLine,
@@ -82,28 +71,26 @@ int WINAPI WinMain(     HINSTANCE hInstance,
 
   InitAsset();
 
-  Version();
+  // Write startup note + version to logfile
   StartupStore(TEXT("Starting XCSoar %s\n"), XCSoar_Version);
 
+  // Read options from the command line
   XCSoarGetOpts(lpCmdLine);
 
 #ifndef ENABLE_SDL
   InitCommonControls();
 #endif /* !ENABLE_SDL */
 
+  // Write initialization note to logfile
   StartupStore(TEXT("Initialise application instance\n"));
 
   // Perform application initialization and run loop
   if (XCSoarInterface::Startup (hInstance, lpCmdLine)) {
-    return WindowsMessageLoop(hInstance);
+    return CommonInterface::main_window.event_loop(IDC_XCSOAR);
   } else {
     return FALSE;
   }
 }
-
-
-/////////////////////////////////////////
-
 
 /*
 #if _DEBUG

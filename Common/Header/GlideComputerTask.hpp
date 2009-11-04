@@ -43,6 +43,11 @@ Copyright_License {
 #include "OnLineContest.h"
 #include "GPSClock.hpp"
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::max;
+#endif
+
 struct WAYPOINT;
 struct WPCALC;
 
@@ -56,7 +61,7 @@ public:
   virtual bool ValidStartSpeed(const DWORD Margin=0) const;
 protected:
   void Initialise() {}
-  void ProcessBasicTask(const double mc_setting, 
+  void ProcessBasicTask(const double mc_setting,
 			const double cruise_efficiency);
   void ResetFlight(const bool full=true);
   virtual void StartTask(const bool do_advance,
@@ -131,7 +136,7 @@ private:
 public:
   virtual void ResetEnter();
   double AATCloseDistance(void) const {
-    return max(100,Basic().Speed*1.5);
+    return max(100.0, Basic().Speed*1.5);
   }
 };
 

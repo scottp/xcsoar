@@ -38,18 +38,55 @@ Copyright_License {
 #ifndef XCSOAR_SCREEN_BUTTON_WINDOW_HXX
 #define XCSOAR_SCREEN_BUTTON_WINDOW_HXX
 
+#ifdef ENABLE_SDL
+
+#include "Screen/PaintWindow.hpp"
+
+/**
+ * A clickable button.
+ */
+class ButtonWindow : public PaintWindow
+{
+  const TCHAR *text;
+  unsigned id;
+  bool down;
+  Font font;
+
+public:
+  ButtonWindow():down(false) {}
+  ~ButtonWindow() { reset(); }
+
+public:
+  void set(ContainerWindow &parent, const TCHAR *text, unsigned id,
+           int left, int top, unsigned width, unsigned height);
+  void reset();
+
+protected:
+  virtual bool on_mouse_down(int x, int y);
+  virtual bool on_mouse_up(int x, int y);
+  virtual void on_paint(Canvas &canvas);
+};
+
+#else /* !ENABLE_SDL */
+
 #include "Screen/Window.hpp"
+
+#include <tchar.h>
 
 /**
  * A clickable button.
  */
 class ButtonWindow : public Window {
 public:
-  void set(ContainerWindow &parent, const TCHAR *text,
+  void set(ContainerWindow &parent, const TCHAR *text, unsigned id,
            int left, int top, unsigned width, unsigned height) {
     Window::set(&parent, _T("BUTTON"), text,
                 left, top, width, height);
+
+    ::SetWindowLong(hWnd, GWL_ID, id);
   }
 };
+
+#endif /* !ENABLE_SDL */
 
 #endif

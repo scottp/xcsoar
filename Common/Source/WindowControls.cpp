@@ -39,7 +39,6 @@ Copyright_License {
 #include "Interface.hpp"
 #include "Dialogs/dlgTools.h"
 #ifndef ALTAIRSYNC
-#include "Message.h"
 #include "Protection.hpp"
 #include "InfoBoxLayout.h"
 #include "MainWindow.hpp"
@@ -57,19 +56,19 @@ Copyright_License {
 #include "Asset.hpp"
 #endif
 
-#ifndef ALTAIRSYNC
-
-#ifndef GNAV
-#ifndef WINDOWSPC
-#ifndef __MINGW32__
+#if !defined(ALTAIRSYNC) && !defined(GNAV) && !defined(WINDOWSPC) && \
+  !defined(__MINGW32__) && !defined(HAVE_POSIX)
 #include <projects.h>
-#endif
-#endif
-#endif
 #endif
 
 #include <assert.h>
 #include <stdio.h>
+
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
 
 #ifdef ALTAIRSYNC
 #define ISCALE 1
@@ -386,34 +385,21 @@ void WindowControl::SetCaption(const TCHAR *Value){
     Value = TEXT("");
 
   if (_tcscmp(mCaption, Value) != 0){
-
     _tcscpy(mCaption, Value);
-
-    update(get_client_rect());
-    update();
+    invalidate();
   }
 
 }
 
-bool WindowControl::SetFocused(bool Value, HWND FromTo){
-  (void)FromTo;
+bool WindowControl::SetFocused(bool Value){
   bool res = mHasFocus;
 
   if (mHasFocus != Value){
     mHasFocus = Value;
 
-    if (mCanFocus){
-      RECT rc;
-      rc.left = 0;
-      rc.top = 0;
-      rc.right = GetWidth();
-      rc.bottom = GetHeight();
-      update(rc);
+    if (mCanFocus)
       // todo, only paint the selector edges
-      update();
-      // Paint(GetDeviceContext());
-    }
-
+      invalidate();
   }
 
   if (Value){
@@ -444,8 +430,9 @@ bool WindowControl::GetFocused(void){
   return(mHasFocus);
 }
 
-bool WindowControl::SetVisible(bool Value){
-  bool res = mVisible;
+void
+WindowControl::SetVisible(bool Value)
+{
   if (mVisible != Value){
 
     mVisible = Value;
@@ -457,15 +444,12 @@ bool WindowControl::SetVisible(bool Value){
     */
 
     if (mVisible){
-      update(get_client_rect());
-      update();
       show();
     } else {
       hide();
     }
 
   }
-  return(res);
 }
 
 bool WindowControl::GetVisible(void){
@@ -480,8 +464,7 @@ int WindowControl::SetBorderKind(int Value){
   int res = mBorderKind;
   if (mBorderKind != Value){
     mBorderKind = Value;
-    update(get_client_rect());
-    update();
+    invalidate();
   }
   return(res);
 }
@@ -555,10 +538,7 @@ WindowControl::PaintSelector(Canvas &canvas)
 }
 
 void WindowControl::Redraw(void){
-  if (GetVisible()){
-    update(get_client_rect());
-    update();
-  }
+  invalidate();
 }
 
 int WindowControl::OnHelp() {
@@ -566,7 +546,7 @@ int WindowControl::OnHelp() {
     return(0); // undefined. return 1 if defined
 #else
     if (mHelpText) {
-      dlgHelpShowModal(XCSoarInterface::main_window, mCaption, mHelpText);
+      dlgHelpShowModal(*get_root_owner(), mCaption, mHelpText);
       return(1);
     } else {
       if (mOnHelpCallback) {
@@ -610,15 +590,12 @@ WindowControl::on_key_up(unsigned key_code)
 void
 WindowControl::on_paint(Canvas &canvas)
 {
-
   RECT rc;
 
   rc.left = 0;
   rc.top = 0;
   rc.right = 0 + mWidth+2;
   rc.bottom = 0 + mHeight+2;
-
-  if (!mVisible) return;
 
   canvas.fill_rectangle(rc, GetBackBrush());
 
@@ -656,6 +633,8 @@ WindowControl::on_paint(Canvas &canvas)
   }
 
   PaintSelector(canvas);
+
+  ContainerWindow::on_paint(canvas);
 }
 
 WindowControl *WindowControl::FocusNext(WindowControl *Sender){
@@ -708,6 +687,22 @@ WindowControl *WindowControl::FocusPrev(WindowControl *Sender){
   return(NULL);
 }
 
+bool
+WindowControl::on_setfocus()
+{
+  ContainerWindow::on_setfocus();
+  SetFocused(true);
+  return true;
+}
+
+bool
+WindowControl::on_killfocus()
+{
+  ContainerWindow::on_killfocus();
+  SetFocused(false);
+  return true;
+}
+
 #ifndef ENABLE_SDL
 
 LRESULT
@@ -715,14 +710,6 @@ WindowControl::on_message(HWND hwnd, UINT uMsg,
                           WPARAM wParam, LPARAM lParam)
 {
   switch (uMsg){
-    case WM_SETFOCUS:
-      SetFocused(true, (HWND) wParam);
-    return(0);
-
-    case WM_KILLFOCUS:
-      SetFocused(false, (HWND) wParam);
-    return(0);
-
   case WM_ERASEBKGND:
   case WM_PAINT:
   case WM_WINDOWPOSCHANGED:
@@ -762,10 +749,12 @@ void InitWindowControlModule(void){
 
 PeriodClock WndForm::timeAnyOpenClose;
 
+#ifndef ENABLE_SDL
 ACCEL  WndForm::mAccel[] = {
   {0, VK_ESCAPE,  VK_ESCAPE},
   {0, VK_RETURN,  VK_RETURN},
 };
+#endif /* !ENABLE_SDL */
 
 WndForm::WndForm(ContainerWindow *Parent,
                  const TCHAR *Name, const TCHAR *Caption,
@@ -779,7 +768,9 @@ WndForm::WndForm(ContainerWindow *Parent,
   mOnTimerNotify = NULL;
   bLButtonDown= false;
 
+#ifndef ENABLE_SDL
   mhAccelTable = CreateAcceleratorTable(mAccel, sizeof(mAccel)/sizeof(mAccel[0]));
+#endif /* !ENABLE_SDL */
 
   mColorTitle = clAqua;
 
@@ -818,7 +809,9 @@ void WndForm::Destroy(void){
 
   kill_timer(cbTimerID);
 
+#ifdef WIN32
   DestroyAcceleratorTable(mhAccelTable);
+#endif /* WIN32 */
 
   WindowControl::Destroy();  // delete all childs
 
@@ -845,7 +838,7 @@ void WndForm::AddClient(WindowControl *Client){      // add client window
 
 
 bool
-WndForm::on_command(HWND hWnd, unsigned id, unsigned code)
+WndForm::on_command(unsigned id, unsigned code)
 {
    // VENTA- DEBUG HARDWARE KEY PRESSED
 #ifdef VENTA_DEBUG_KEY
@@ -858,7 +851,7 @@ WndForm::on_command(HWND hWnd, unsigned id, unsigned code)
      return true;
    }
 
-   return WindowControl::on_command(hWnd, id, code);
+   return WindowControl::on_command(id, code);
 }
 
 bool
@@ -904,15 +897,13 @@ int WndForm::ShowModal(void){
 
 int WndForm::ShowModal(bool bEnableMap) {
 #define OPENCLOSESUPPRESSTIME 500
+#ifndef ENABLE_SDL
   MSG msg;
   HWND oldFocusHwnd;
+#endif /* !ENABLE_SDL */
 
   PeriodClock enter_clock;
   enter_clock.update();
-
-#ifndef ALTAIRSYNC
-  Message::BlockRender(true);
-#endif
 
   RECT mRc = get_position();
   DrawWireRects(XCSoarInterface::EnableAnimation,&mRc, 5);
@@ -923,16 +914,37 @@ int WndForm::ShowModal(bool bEnableMap) {
 
   mModalResult = 0;
 
+#ifndef ENABLE_SDL
   oldFocusHwnd = ::GetFocus();
+#endif /* !ENABLE_SDL */
   set_focus();
 
   FocusNext(NULL);
 
+#ifndef ENABLE_SDL
   bool hastimed = false;
+#endif /* !ENABLE_SDL */
   WndForm::timeAnyOpenClose.update(); // when current dlg opens or child closes
 
 #ifdef ENABLE_SDL
-  // XXX
+
+  update();
+
+  SDL_Event event;
+  while (SDL_WaitEvent(&event)) {
+    if (event.type == SDL_QUIT)
+      break;
+
+    if (event.type >= SDL_USEREVENT && event.type <= SDL_NUMEVENTS-1 &&
+        event.user.data1 != NULL) {
+      Window *window = (Window *)event.user.data1;
+      window->on_user(event.type - SDL_USEREVENT);
+    } else
+      parent->on_event(event);
+  }
+
+  return 0;
+
 #else /* !ENABLE_SDL */
   while ((mModalResult == 0) && GetMessage(&msg, NULL, 0, 0)) {
 //hack!
@@ -964,7 +976,7 @@ int WndForm::ShowModal(bool bEnableMap) {
 #ifndef GNAV
         &&  !( // exception
               bEnableMap
-              && msg.hwnd == XCSoarInterface::main_window.map
+              && MapWindow::identify(msg.hwnd)
               && (
                 msg.message == WM_LBUTTONDOWN
                 || msg.message == WM_LBUTTONUP
@@ -1102,22 +1114,17 @@ int WndForm::ShowModal(bool bEnableMap) {
   SetSourceRectangle(aniRect);
   */
 
+#ifndef ENABLE_SDL
   SetFocus(oldFocusHwnd);
-
-#ifndef ALTAIRSYNC
-  Message::BlockRender(false);
-#endif
+#endif /* !ENABLE_SDL */
 
   return(mModalResult);
-
 }
 
 void
 WndForm::on_paint(Canvas &canvas)
 {
-  SIZE tsize;
-
-  if (!GetVisible()) return;
+  WindowControl::on_paint(canvas);
 
   RECT rcClient = get_client_rect();
 
@@ -1131,7 +1138,7 @@ WndForm::on_paint(Canvas &canvas)
   canvas.background_transparent();
 
   canvas.select(*mhTitleFont);
-  tsize = canvas.text_size(mCaption);
+  SIZE tsize = canvas.text_size(mCaption);
 
   // JMW todo add here icons?
 
@@ -1158,8 +1165,7 @@ void WndForm::SetCaption(const TCHAR *Value){
 
   if (_tcscmp(mCaption, Value) != 0){
     _tcscpy(mCaption, Value);
-    update(mTitleRect);
-    update();
+    invalidate(mTitleRect);
   }
 
 }
@@ -1208,15 +1214,6 @@ WndForm::SetUserMsgNotify(bool (*OnUserMsgNotify)(WindowControl *Sender, unsigne
 }
 
 // normal form stuff (nonmodal)
-
-bool WndForm::SetFocused(bool Value, HWND FromTo){
-
-  bool res = WindowControl::SetFocused(Value, FromTo);
-
-  return(res);
-
-}
-
 
 int WndForm::OnUnhandledMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam){
 
@@ -1334,7 +1331,7 @@ WndButton::on_mouse_up(int x, int y)
 
   mDown = false;
   on_paint(get_canvas());
-  ReleaseCapture();
+  release_capture();
 
   Pos.x = x;
   Pos.y = y;
@@ -1412,10 +1409,9 @@ WndButton::on_mouse_down(int x, int y)
   mDown = true;
   if (!GetFocused())
     set_focus();
-  else {
-    update(get_client_rect());
-    update();
-  }
+  else
+    invalidate();
+
   set_capture();
   return true;
 }
@@ -1425,8 +1421,7 @@ WndButton::on_mouse_double(int x, int y)
 {
   (void)x; (void)y;
   mDown = true;
-  update(get_client_rect());
-  update();
+  invalidate();
   set_capture();
   return true;
 }
@@ -1435,8 +1430,6 @@ WndButton::on_mouse_double(int x, int y)
 void
 WndButton::on_paint(Canvas &canvas)
 {
-  if (!GetVisible()) return;
-
   WindowControl::on_paint(canvas);
 
   RECT rc = get_client_rect();
@@ -1514,6 +1507,13 @@ WndProperty::Editor::on_mouse_down(int x, int y)
     }
   } //end combopicker
 
+#ifndef ENABLE_SDL
+  if (parent->GetReadOnly())
+    /* drop this event, so the default handler doesn't obtain the
+       keyboard focus */
+    return true;
+#endif /* !ENABLE_SDL */
+
   return false;
 }
 
@@ -1573,38 +1573,23 @@ WndProperty::Editor::on_key_up(unsigned key_code)
   return false;
 }
 
-#ifdef ENABLE_SDL
-// XXX
-#else /* !ENABLE_SDL */
-LRESULT
-WndProperty::Editor::on_message(HWND hWnd, UINT message,
-                                WPARAM wParam, LPARAM lParam)
+bool
+WndProperty::Editor::on_setfocus()
 {
-  switch (message) {
-    case WM_SETFOCUS:
-      KeyTimer(true, 0);
-      if (parent->GetReadOnly()) {
-        SetFocus((HWND)wParam);
-        return(0);
-      } else {
-        if ((HWND)wParam != parent->GetHandle()) {
-          parent->SetFocused(true, (HWND) wParam);
-        }
-      }
-    break;
-
-    case WM_KILLFOCUS:
-      KeyTimer(true, 0);
-      if ((HWND)wParam != parent->GetHandle()){
-        parent->SetFocused(false, (HWND) wParam);
-      }
-    break;
-  }
-
-  return EditWindow::on_message(hWnd, message, wParam, lParam);
+  KeyTimer(true, 0);
+  EditWindow::on_setfocus();
+  parent->on_editor_setfocus();
+  return true;
 }
-#endif /* !ENABLE_SDL */
 
+bool
+WndProperty::Editor::on_killfocus()
+{
+  KeyTimer(true, 0);
+  parent->on_editor_killfocus();
+  EditWindow::on_killfocus();
+  return true;
+}
 
 Bitmap WndProperty::hBmpLeft32;
 Bitmap WndProperty::hBmpRight32;
@@ -1657,8 +1642,8 @@ WndProperty::WndProperty(WindowControl *Parent,
   SetBackColor(GetOwner()->GetBackColor());
 
   if (InstCount == 0){
-    hBmpLeft32.load(MAKEINTRESOURCE(IDB_DLGBUTTONLEFT32));
-    hBmpRight32.load(MAKEINTRESOURCE(IDB_DLGBUTTONRIGHT32));
+    hBmpLeft32.load(IDB_DLGBUTTONLEFT32);
+    hBmpRight32.load(IDB_DLGBUTTONRIGHT32);
   }
   InstCount++;
 
@@ -1754,10 +1739,7 @@ int WndProperty::SetButtonSize(int Value){
 
     edit.move(mEditPos.x, mEditPos.y, mEditSize.x, mEditSize.y);
 
-    if (GetVisible()){
-      update(get_client_rect());
-      update();
-    }
+    invalidate();
   }
   return(res);
 }
@@ -1775,40 +1757,45 @@ bool WndProperty::SetReadOnly(bool Value){
   return(res);
 }
 
-bool WndProperty::SetFocused(bool Value, HWND FromTo){
-#ifdef ENABLE_SDL
-  // XXX
-#else /* !ENABLE_SDL */
-  const HWND mhEdit = edit;
-  TCHAR sTmp[128];
+bool
+WndProperty::on_setfocus()
+{
+  edit.set_focus();
+  edit.set_selection();
+  return true;
+}
 
-  if (!Value && (FromTo == mhEdit))
-    Value = true;
+bool
+WndProperty::on_killfocus()
+{
+  return true;
+}
 
-    if (Value != GetFocused()){
-      if (Value){
-        if (mDataField != NULL){
-          mDataField->GetData();
-          edit.set_text(mDataField->GetAsString());
-        }
-      } else {
-        if (mDataField != NULL){
-          GetWindowText(mhEdit, sTmp, (sizeof(sTmp)/sizeof(TCHAR))-1);
-          mDataField->SetAsString(sTmp);
-          mDataField->SetData();
-          edit.set_text(mDataField->GetAsDisplayString());
-      }
-    }
+void
+WndProperty::on_editor_setfocus()
+{
+  if (mDataField != NULL) {
+    mDataField->GetData();
+    edit.set_text(mDataField->GetAsString());
   }
 
-  if (FromTo != mhEdit)
-    WindowControl::SetFocused(Value, FromTo);
-#endif /* !ENABLE_SDL */
-  if (Value){
-    edit.set_focus();
-    edit.set_selection();
+  if (!GetFocused())
+    SetFocused(true);
+}
+
+void
+WndProperty::on_editor_killfocus()
+{
+  if (mDataField != NULL) {
+    TCHAR sTmp[128];
+    edit.get_text(sTmp, (sizeof(sTmp)/sizeof(TCHAR))-1);
+    mDataField->SetAsString(sTmp);
+    mDataField->SetData();
+    edit.set_text(mDataField->GetAsDisplayString());
   }
-  return(0);
+
+  if (GetFocused())
+    SetFocused(false);
 }
 
 bool
@@ -1850,7 +1837,7 @@ WndProperty::on_mouse_down(int x, int y)
   {
     if (!GetReadOnly())  // when they click on the label
     {
-      dlgComboPicker(XCSoarInterface::main_window, this);
+      dlgComboPicker(*get_root_owner(), this);
     }
     else
     {
@@ -1874,16 +1861,14 @@ WndProperty::on_mouse_down(int x, int y)
 
     if (mDownDown) {
       DecValue();
-      update(mHitRectDown);
-      update();
+      invalidate(mHitRectDown);
     }
 
     mUpDown = (PtInRect(&mHitRectUp, Pos) != 0);
 
     if (mUpDown) {
       IncValue();
-      update(mHitRectUp);
-      update();
+      invalidate(mHitRectUp);
     }
     set_capture();
   }
@@ -1908,13 +1893,11 @@ WndProperty::on_mouse_up(int x, int y)
 
     if (mDownDown){
       mDownDown = false;
-      update(mHitRectDown);
-      update();
+      invalidate(mHitRectDown);
     }
     if (mUpDown){
       mUpDown = false;
-      update(mHitRectUp);
-      update();
+      invalidate(mHitRectUp);
     }
 
   }
@@ -1955,8 +1938,6 @@ WndProperty::on_paint(Canvas &canvas)
   RECT r;
   SIZE tsize;
   POINT org;
-
-  if (!GetVisible()) return;
 
   WindowControl::on_paint(canvas);
 
@@ -2081,8 +2062,6 @@ DataField *WndProperty::SetDataField(DataField *Value){
 void
 WndOwnerDrawFrame::on_paint(Canvas &canvas)
 {
-  if (!GetVisible()) return;
-
   WndFrame::on_paint(canvas);
 
   canvas.select(*GetFont());
@@ -2120,8 +2099,6 @@ WndFrame::on_key_down(unsigned key_code)
 void
 WndFrame::on_paint(Canvas &canvas)
 {
-  if (!GetVisible()) return;
-
   if (mIsListItem && GetOwner()!=NULL) {
     ((WndListFrame*)GetOwner())->PrepareItemDraw();
   }
@@ -2152,8 +2129,7 @@ void WndFrame::SetCaption(const TCHAR *Value){
 
   if (_tcscmp(mCaption, Value) != 0){
     _tcscpy(mCaption, Value);  // todo size check
-    update(get_client_rect());
-    update();
+    invalidate();
   }
 }
 
@@ -2161,9 +2137,7 @@ UINT WndFrame::SetCaptionStyle(UINT Value){
   UINT res = mCaptionStyle;
   if (res != Value){
     mCaptionStyle = Value;
-
-    update(get_client_rect());
-    update();
+    invalidate();
   }
   return(res);
 }
@@ -2409,15 +2383,7 @@ void WndListFrame::DrawScrollBar(Canvas &canvas) {
     rc.top += d;
   }
 
-  unsigned long ctScroll =0;
-
   bool bTransparentUpDown = true;
-  bool bTransparentScroll = true;
-
-  if (bTransparentScroll)
-    ctScroll=SRCAND;  //Combines the colors of the source and destination rectangles by using the Boolean AND operator.
-  else
-    ctScroll=SRCCOPY;  //Copies the source rectangle directly to the destination rectangle.
 
   BitmapCanvas bitmap_canvas(canvas);
 
@@ -2696,8 +2662,7 @@ WndFrame::on_mouse_down(int xPos, int yPos)
       //return(1);
     }
     //else {  // always doing this allows selected item in list to remain selected.
-      update(get_client_rect());
-      update();
+      invalidate();
     //}
 
     WndListFrame* wlf = ((WndListFrame*)GetOwner());
@@ -2777,7 +2742,7 @@ WndListFrame::on_mouse_move(int x, int y, unsigned keys)
 
     if (mMouseDown && PtInRect(&rcScrollBar, Pos))
     {
-      int iScrollBarTop = max(1, Pos.y - mMouseScrollBarYOffset);
+      int iScrollBarTop = max(1, (int)Pos.y - mMouseScrollBarYOffset);
 
       int iScrollIndex = GetScrollIndexFromScrollBarTop(iScrollBarTop);
 
@@ -2807,7 +2772,8 @@ WndListFrame::on_mouse_down(int x, int y)
 
   if (PtInRect(&rcScrollBarButton, Pos))  // see if click is on scrollbar handle
   {
-    mMouseScrollBarYOffset = max(0, Pos.y - rcScrollBarButton.top);  // start mouse drag
+    // start mouse drag
+    mMouseScrollBarYOffset = max(0, (int)(Pos.y - rcScrollBarButton.top));
     mMouseDown=true;
 
   }

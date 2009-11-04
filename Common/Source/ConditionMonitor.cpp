@@ -56,7 +56,7 @@ Copyright_License {
 #include "Components.hpp"
 #include "WayPointList.hpp"
 
-// JMW TODO: make this use GPSClock (code re-use)
+// TODO: JMW: make this use GPSClock (code re-use)
 
 class ConditionMonitor {
 public:
@@ -127,10 +127,6 @@ private:
 
 };
 
-
-///////
-
-
 class ConditionMonitorWind: public ConditionMonitor {
 public:
   ConditionMonitorWind() {
@@ -180,7 +176,6 @@ private:
 
 };
 
-
 class ConditionMonitorFinalGlide: public ConditionMonitor {
 public:
   ConditionMonitorFinalGlide() {
@@ -188,8 +183,8 @@ public:
     Interval_Check = 1;
     tad = 0;
   }
-protected:
 
+protected:
   bool CheckCondition(const GlideComputer& cmp) {
     if (!cmp.Calculated().Flying || !task.Valid()) {
       return false;
@@ -198,7 +193,7 @@ protected:
     tad = cmp.Calculated().TaskAltitudeDifference*0.2+0.8*tad;
 
     bool BeforeFinalGlide =
-      (task.ValidTaskPoint(task.getActiveIndex()+1) 
+      (task.ValidTaskPoint(task.getActiveIndex()+1)
        && !cmp.Calculated().FinalGlide);
 
     if (BeforeFinalGlide) {
@@ -218,7 +213,7 @@ protected:
         }
         if ((last_tad> 1) && (tad< -50)) {
           // dropped well below final glide, previously above
-	  last_tad = tad;
+          last_tad = tad;
           return true; // JMW this was true before
         }
       }
@@ -243,8 +238,6 @@ private:
   double tad;
   double last_tad;
 };
-
-
 
 class ConditionMonitorSunset: public ConditionMonitor {
 public:
@@ -287,7 +280,6 @@ protected:
 private:
 };
 
-
 class ConditionMonitorAATTime: public ConditionMonitor {
 public:
   ConditionMonitorAATTime() {
@@ -324,7 +316,6 @@ protected:
 private:
 };
 
-
 class ConditionMonitorStartRules: public ConditionMonitor {
 public:
   ConditionMonitorStartRules() {
@@ -342,7 +333,7 @@ protected:
     if (cmp.Calculated().LegDistanceToGo>task.getSettings().StartRadius) {
       return false;
     }
-    if (cmp.ValidStartSpeed(task.getSettings().StartMaxSpeedMargin) 
+    if (cmp.ValidStartSpeed(task.getSettings().StartMaxSpeedMargin)
 	&& cmp.InsideStartHeight(task.getSettings().StartMaxHeightMargin))
     {
       withinMargin = true;
@@ -367,7 +358,6 @@ private:
   bool withinMargin;
 };
 
-
 class ConditionMonitorGlideTerrain: public ConditionMonitor {
 public:
   ConditionMonitorGlideTerrain() {
@@ -387,7 +377,7 @@ protected:
     fgtt = !((cmp.Calculated().TerrainWarningLocation.Latitude == 0.0) &&
 	     (cmp.Calculated().TerrainWarningLocation.Longitude == 0.0));
 
-    if (!cmp.Calculated().FinalGlide 
+    if (!cmp.Calculated().FinalGlide
 	|| (cmp.Calculated().TaskAltitudeDifference<-50)) {
       fgtt_last = false;
     } else if ((fgtt) && (!fgtt_last)) {

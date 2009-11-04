@@ -48,25 +48,58 @@ class ProgressWindow;
 
 class CommonInterface {
 public:
-  // instance of main program
+  /** Instance of the main application */
   static HINSTANCE hInst;
-// window.. make this protected TODO so have to subclass to get access
+
+  // window.. make this protected TODO so have to subclass to get access
   static StatusMessageList status_messages;
   static MainWindow main_window;
 
   // TODO: make this protected
+  /**
+   * Returns InterfaceBlackboard.Basic (NMEA_INFO) (read-only)
+   * @return InterfaceBlackboard.Basic
+   */
   static const NMEA_INFO& Basic() { return blackboard.Basic(); }
+
+  /**
+   * Returns InterfaceBlackboard.Calculated (DERIVED_INFO) (read-only)
+   * @return InterfaceBlackboard.Calculated
+   */
   static const DERIVED_INFO& Calculated() { return blackboard.Calculated(); }
+
+  /**
+   * Returns InterfaceBlackboard.MapProjection (MapWindowProjection) (read-only)
+   * @return InterfaceBlackboard.MapProjection
+   */
   static const MapWindowProjection& MapProjection()
   { return blackboard.MapProjection(); }
 
+  /**
+   * Returns the InterfaceBlackboard.SettingsComputer (read-only)
+   * @return The InterfaceBlackboard.SettingsComputer
+   */
   static const SETTINGS_COMPUTER& SettingsComputer()
   { return blackboard.SettingsComputer(); }
+
+  /**
+   * Returns the InterfaceBlackboard.SettingsComputer (read-write)
+   * @return The InterfaceBlackboard.SettingsComputer
+   */
   static SETTINGS_COMPUTER& SetSettingsComputer()
   { return blackboard.SetSettingsComputer(); }
 
+  /**
+   * Returns the InterfaceBlackboard.SettingsMap (read-only)
+   * @return The InterfaceBlackboard.SettingsMap
+   */
   static const SETTINGS_MAP& SettingsMap()
   { return blackboard.SettingsMap(); }
+
+  /**
+   * Returns the InterfaceBlackboard.SettingsMap (read-write)
+   * @return The InterfaceBlackboard.SettingsMap
+   */
   static SETTINGS_MAP& SetSettingsMap()
   { return blackboard.SetSettingsMap(); }
 
@@ -84,8 +117,8 @@ private:
 public:
   // settings
   static bool VirtualKeys;
-  static bool EnableAutoBacklight; 
-  static bool EnableAutoSoundVolume; 
+  static bool EnableAutoBacklight;
+  static bool EnableAutoSoundVolume;
   static int  ActiveAlternate;
   static bool EnableAnimation;
 };
@@ -99,7 +132,7 @@ protected:
   static void DisplayModes();
   static void SendSettingsComputer();
   static void SendSettingsMap(const bool trigger_draw=false);
-public: 
+public:
   // ideally these should be protected
   static void on_key_None(int UpDown);
   static void on_key_WindSpeed(int UpDown);

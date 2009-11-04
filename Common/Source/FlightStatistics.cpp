@@ -59,6 +59,12 @@ Copyright_License {
 #include "options.h" /* for IBLSCALE() */
 #include "Components.hpp"
 
+#ifndef _MSC_VER
+#include <algorithm>
+using std::min;
+using std::max;
+#endif
+
 void FlightStatistics::Reset() {
   Lock();
   ThermalAverage.Reset();
@@ -191,7 +197,8 @@ void FlightStatistics::RenderClimb(Canvas &canvas, const RECT rc)
   chart.DrawLine(0, MACCREADY, ThermalAverage.sum_n,
 		 MACCREADY, Chart::STYLE_REDTHICK);
 
-  chart.DrawLabel(TEXT("MC"), max(0.5, ThermalAverage.sum_n-1), MACCREADY);
+  chart.DrawLabel(TEXT("MC"), max(0.5, (double)ThermalAverage.sum_n - 1.0),
+                  MACCREADY);
 
   chart.DrawTrendN(&ThermalAverage, Chart::STYLE_BLUETHIN);
 
@@ -254,7 +261,7 @@ void FlightStatistics::RenderGlidePolar(Canvas &canvas, const RECT rc)
   ff= (sb-MACCREADY)/max(1.0, XCSoarInterface::Calculated().VMacCready);
 
   chart.DrawLine(0, MACCREADY,
-		 XCSoarInterface::SettingsComputer().SAFTEYSPEED, 
+		 XCSoarInterface::SettingsComputer().SAFTEYSPEED,
 		 MACCREADY+ff*XCSoarInterface::SettingsComputer().SAFTEYSPEED,
 		 Chart::STYLE_REDTHICK);
 
@@ -353,12 +360,12 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
     y1 = (lat1-lat_c);
     chart.ScaleXFromValue(x1);
     chart.ScaleYFromValue(y1);
-    
+
     if (task.getSettings().AATEnabled) {
       GEOPOINT aatloc;
       double bearing;
       double radius;
-      
+
       if (task.ValidTaskPoint(i+1)) {
         if (task.getTaskPoint(i).AATType == AAT_SECTOR) {
           radius = task.getTaskPoint(i).AATSectorRadius;
@@ -367,7 +374,7 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
         }
         for (int j=0; j<4; j++) {
           bearing = j*360.0/4;
-          
+
           FindLatitudeLongitude(task.getTaskPointLocation(i),
                                 bearing, radius,
                                 &aatloc);
@@ -469,7 +476,7 @@ void FlightStatistics::RenderTask(Canvas &canvas, const RECT rc, const bool olcm
 		       Chart::STYLE_DASHGREEN);
 
 	TCHAR text[100];
-	if ((i==nwps-1) && 
+	if ((i==nwps-1) &&
             (task.getWaypointIndex(i) == task.getWaypointIndex(0))) {
 	  _stprintf(text,TEXT("%0d"),1);
 	  chart.DrawLabel(text, x2, y2);
@@ -569,13 +576,13 @@ void FlightStatistics::RenderTemperature(Canvas &canvas, const RECT rc)
   for (i=0; i<CUSONDE_NUMLEVELS-1; i++) {
     if (CuSonde::cslevels[i].nmeasurements) {
 
-      hmin = min(hmin, i);
-      hmax = max(hmax, i);
+      hmin = min(hmin, (float)i);
+      hmax = max(hmax, (float)i);
       tmin = min(tmin, (float)min(CuSonde::cslevels[i].tempDry,
-			   (float)min(CuSonde::cslevels[i].airTemp,
+                                  min(CuSonde::cslevels[i].airTemp,
 			       CuSonde::cslevels[i].dewpoint)));
       tmax = max(tmax, (float)max(CuSonde::cslevels[i].tempDry,
-			   (float)max(CuSonde::cslevels[i].airTemp,
+                                  (double)max(CuSonde::cslevels[i].airTemp,
 			       CuSonde::cslevels[i].dewpoint)));
     }
   }
@@ -724,8 +731,8 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
   double fj;
   ach = XCSoarInterface::Basic().Altitude;
   acb = XCSoarInterface::Basic().TrackBearing;
-  double hmin = max(0,XCSoarInterface::Basic().Altitude-3300);
-  double hmax = max(3300,XCSoarInterface::Basic().Altitude+1000);
+  double hmin = max(0.0, XCSoarInterface::Basic().Altitude - 3300);
+  double hmax = max(3300.0, XCSoarInterface::Basic().Altitude + 1000);
 
   GEOPOINT d_loc[AIRSPACE_SCANSIZE_X];
   double d_alt[AIRSPACE_SCANSIZE_X];
@@ -739,7 +746,7 @@ void FlightStatistics::RenderAirspace(Canvas &canvas, const RECT rc) {
 
   for (j=0; j< AIRSPACE_SCANSIZE_X; j++) { // scan range
     fj = j*1.0/(AIRSPACE_SCANSIZE_X-1);
-    FindLatitudeLongitude(XCSoarInterface::Basic().Location, 
+    FindLatitudeLongitude(XCSoarInterface::Basic().Location,
                           acb, range*fj,
                           &d_loc[j]);
     d_alt[j] = terrain.GetTerrainHeight(d_loc[j], rounding);
@@ -877,8 +884,8 @@ FlightStatistics::AddAltitudeTerrain(const double tflight,
 				     const double terrainalt)
 {
   Lock();
-  Altitude_Terrain.least_squares_update
-    (max(0,tflight/3600.0),terrainalt);
+  Altitude_Terrain.least_squares_update(max(0.0, tflight / 3600.0),
+                                        terrainalt);
   Unlock();
 }
 
@@ -887,15 +894,14 @@ FlightStatistics::AddAltitude(const double tflight,
 			      const double alt)
 {
   Lock();
-  Altitude.least_squares_update
-    (max(0,tflight/3600.0),alt);
+  Altitude.least_squares_update(max(0.0, tflight / 3600.0), alt);
   Unlock();
 }
 
 double
 FlightStatistics::AverageThermalAdjusted
 (const double mc_current,
- const bool circling) 
+ const bool circling)
 {
   double mc_stats;
   Lock();
@@ -914,7 +920,7 @@ FlightStatistics::AverageThermalAdjusted
 }
 
 void
-FlightStatistics::SaveTaskSpeed(const double val) 
+FlightStatistics::SaveTaskSpeed(const double val)
 {
   Task_Speed.least_squares_update(val);
 }
@@ -939,8 +945,8 @@ FlightStatistics::AddClimbBase(const double tflight,
   if (Altitude_Ceiling.sum_n>0) {
     // only update base if have already climbed, otherwise
     // we will catch the takeoff height as the base.
-    
-    Altitude_Base.least_squares_update(max(0,tflight)/3600.0,
+
+    Altitude_Base.least_squares_update(max(0.0, tflight) / 3600.0,
 				       alt);
   }
   Unlock();
@@ -952,7 +958,7 @@ FlightStatistics::AddClimbCeiling(const double tflight,
 			       const double alt)
 {
   Lock();
-  Altitude_Ceiling.least_squares_update(max(0,tflight)/3600.0,
+  Altitude_Ceiling.least_squares_update(max(0.0, tflight) / 3600.0,
 					alt);
   Unlock();
 }
@@ -1019,7 +1025,7 @@ FlightStatistics::CaptionClimb( TCHAR* sTmp)
 }
 
 
-void 
+void
 FlightStatistics::CaptionPolar(TCHAR *sTmp)
 {
   if (InfoBoxLayout::landscape) {
@@ -1070,11 +1076,11 @@ FlightStatistics::CaptionTask(TCHAR *sTmp)
     TCHAR timetext1[100];
     TCHAR timetext2[100];
     if (task.getSettings().AATEnabled) {
-      Units::TimeToText(timetext1, 
+      Units::TimeToText(timetext1,
 			(int)XCSoarInterface::Calculated().TaskTimeToGo);
-      Units::TimeToText(timetext2, 
+      Units::TimeToText(timetext2,
 			(int)XCSoarInterface::Calculated().AATTimeToGo);
-      
+
       if (InfoBoxLayout::landscape) {
 	_stprintf(sTmp,
 		  TEXT("%s:\r\n  %s\r\n%s:\r\n  %s\r\n%s:\r\n  %5.0f %s\r\n%s:\r\n  %5.0f %s\r\n"),

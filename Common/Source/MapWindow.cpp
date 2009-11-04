@@ -52,7 +52,6 @@ Copyright_License {
 #include "InfoBoxLayout.h"
 #include "RasterTerrain.h"
 #include "TerrainRenderer.h"
-#include "Message.h"
 #include "RasterWeather.h"
 #include "Gauge/GaugeCDI.hpp"
 
@@ -69,12 +68,9 @@ Copyright_License {
 #include <wingdi.h>
 #endif
 
-///////////////////////////////// Initialisation
+// Initialisation
 
 ScreenGraphics MapGfx;
-
-//////////////////////////
-
 
 MapWindow::MapWindow()
   :MapWindowProjection(),
@@ -154,8 +150,6 @@ void MapWindow::StoreRestoreFullscreen(bool store) {
   */
 }
 
-
-///////////////////////////////////////////////////////////////////////////
 #include "DeviceBlackboard.hpp"
 
 void MapWindow::ReadBlackboard(const NMEA_INFO &nmea_info,
@@ -181,9 +175,7 @@ typedef struct {
   bool dirty;
 } MapIdleTrigger;
 
-
-// This idle function allows progressive scanning of visibility etc
-// 
+/** This idle function allows progressive scanning of visibility etc */
 bool MapWindow::Idle(const bool do_force) {
   bool still_dirty=false;
 
@@ -225,7 +217,7 @@ bool MapWindow::Idle(const bool do_force) {
     case 1:
       if (topology_idle.dirty) {
         if (SettingsMap().EnableTopology) {
-          topology_idle.dirty = 
+          topology_idle.dirty =
             topology->ScanVisibility(*this, *getSmartBounds(), do_force);
         } else {
           topology_idle.dirty = false;
@@ -236,7 +228,7 @@ bool MapWindow::Idle(const bool do_force) {
       if (terrain_idle.dirty) {
         terrain.ServiceTerrainCenter(Basic().Location);
         terrain.ServiceCache();
-        
+
         if (!do_force) {
           // JMW this currently isn't working with the smart bounds
           terrain_idle.dirty = false;
@@ -256,19 +248,18 @@ bool MapWindow::Idle(const bool do_force) {
       break;
     }
 
-  } while (RenderTimeAvailable() && 
+  } while (RenderTimeAvailable() &&
 	   !drawTriggerEvent.test() &&
-	   (still_dirty = 
-	      main_idle.dirty 
-	    | terrain_idle.dirty 
+	   (still_dirty =
+	      main_idle.dirty
+	    | terrain_idle.dirty
 	    | topology_idle.dirty
 	    | rasp_idle.dirty));
 
   return still_dirty;
 }
 
-
-void MapWindow::ExchangeBlackboard(void) 
+void MapWindow::ExchangeBlackboard(void)
 {
   ReadBlackboard(device_blackboard.Basic(), device_blackboard.Calculated());
   ApplyScreenSize();
@@ -290,10 +281,7 @@ void MapWindow::DrawThreadLoop(void) {
   Render(draw_canvas, MapRect);
 
   // copy to canvas
-  mutexBuffer.Lock();
-  get_canvas().copy(draw_canvas);
-  mutexBuffer.Unlock();
-  update(MapRect);
+  invalidate();
 
   StopTimer();
 }
@@ -327,6 +315,17 @@ MapWindow::register_class(HINSTANCE hInstance)
 #endif /* !ENABLE_SDL */
 }
 
+#ifdef WIN32
+bool
+MapWindow::identify(HWND hWnd)
+{
+  TCHAR name[16];
+  if (::GetClassName(hWnd, name, sizeof(name)) == 0)
+    return false;
+  return _tcscmp(name, _T("XCSoarMap"));
+}
+#endif /* WIN32 */
+
 bool MapWindow::checkLabelBlock(const RECT brect) {
   return label_block.check(brect);
 }
@@ -346,11 +345,8 @@ void MapWindow::ScanVisibility(rectObj *bounds_active) {
   ScanVisibilityAirspace(bounds_active);
 }
 
-
-
-
 void MapWindow::SwitchZoomClimb(void) {
-  
+
   bool isclimb = (DisplayMode == dmCircling);
 
   bool my_target_pan = SettingsMap().TargetPan;
@@ -431,7 +427,6 @@ void MapWindow::ApplyScreenSize() {
   }
 }
 
-
 bool MapWindow::draw_masked_bitmap_if_visible(Canvas &canvas,
 					      Bitmap &bitmap,
 					      const GEOPOINT &loc,
@@ -448,5 +443,3 @@ bool MapWindow::draw_masked_bitmap_if_visible(Canvas &canvas,
   }
   return false;
 }
-
-

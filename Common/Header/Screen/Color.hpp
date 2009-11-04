@@ -60,6 +60,7 @@ struct Color {
 #ifdef ENABLE_SDL
   Color() {
     value.r = 0; value.g = 0; value.b = 0;
+    value.unused = SDL_ALPHA_OPAQUE;
   }
   Color(int r, int g, int b) {
     value.r = r;
@@ -98,19 +99,13 @@ struct Color {
   }
 
 #ifdef ENABLE_SDL
-  Color &operator =(const Color c) {
-    value.r = c.value.r;
-    value.g = c.value.g;
-    value.b = c.value.b;
-    return *this;
-  }
-
   operator const SDL_Color() const {
     return value;
   }
 
   Uint32 gfx_color() const {
-    return *(const Uint32*)&value;
+    return ((Uint32)value.r << 24) | ((Uint32)value.g << 16) |
+      ((Uint32)value.b << 8) | (Uint32)value.unused;
   }
 #else
   Color &operator =(COLORREF c) {
