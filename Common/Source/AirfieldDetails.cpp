@@ -55,6 +55,9 @@ ZZIP_FILE* zAirfieldDetails = NULL;
 
 static TCHAR  szAirfieldDetailsFile[MAX_PATH] = TEXT("\0");
 
+/**
+ * Opens the airfield details file handle
+ */
 static void
 OpenAirfieldDetails()
 {
@@ -86,6 +89,9 @@ OpenAirfieldDetails()
   }
 }
 
+/**
+ * Closes the airfield details file handle
+ */
 static void
 CloseAirfieldDetails()
 {
@@ -196,13 +202,17 @@ LookupAirfieldDetail(TCHAR *Name, const TCHAR *Details)
 
 #define DETAILS_LENGTH 5000
 
-/*
- * VENTA3 fix: if empty lines, do not set details for the waypoint
- *        fix: remove CR from text appearing as a spurious char in waypoint details
+/**
+ * Parses the data provided by the airfield details file handle
  */
 static void
 ParseAirfieldDetails()
 {
+  /*
+   * VENTA3 fix: if empty lines, do not set details for the waypoint
+   *        fix: remove CR from text appearing as a spurious char in waypoint details
+   */
+
   if(zAirfieldDetails == NULL)
     return;
 
@@ -222,77 +232,70 @@ ParseAirfieldDetails()
   unsigned j;
   int k=0;
 
-  while(ReadString(zAirfieldDetails,READLINE_LENGTH,TempString))
-    {
-      if(TempString[0]=='[') { // Look for start
+  while (ReadString(zAirfieldDetails, READLINE_LENGTH, TempString)) {
+    if (TempString[0] == '[') { // Look for start
+      if (inDetails) {
+        LookupAirfieldDetail(Name, Details);
+        Details[0] = 0;
+        Name[0] = 0;
+        hasDetails = false;
+      }
 
-	if (inDetails) {
-	  LookupAirfieldDetail(Name, Details);
-	  Details[0]= 0;
-	  Name[0]= 0;
-	  hasDetails=false;
-	}
-
-	// extract name
-	for (i=1; i<200; i++) {
-	  if (TempString[i]==']') {
-	    break;
-	  }
-	  Name[i-1]= TempString[i];
-	}
-	Name[i-1]= 0;
-
-	inDetails = true;
-
-        if (k % 20 == 0) {
-	  XCSoarInterface::StepProgressDialog();
+      // extract name
+      for (i = 1; i < 200; i++) {
+        if (TempString[i] == ']') {
+          break;
         }
-        k++;
+        Name[i - 1] = TempString[i];
+      }
+      Name[i - 1] = 0;
 
-      } else {
-	// VENTA3: append text to details string
-	for (j=0; j<_tcslen(TempString); j++ ) {
-	  if ( TempString[j] > 0x20 ) {
-	    hasDetails = true;
-	    break;
-	  }
-	}
-	// first hasDetails set true for rest of details
-	if (hasDetails==true) {
+      inDetails = true;
 
-	  // Remove carriage returns
-	  for (j=0, n=0; j<_tcslen(TempString); j++) {
-	    if ( TempString[j] == 0x0d ) continue;
-	    CleanString[n++]=TempString[j];
-	  }
-	  CleanString[n]='\0';
+      if (k % 20 == 0) {
+        XCSoarInterface::StepProgressDialog();
+      }
+      k++;
+    } else {
+      // VENTA3: append text to details string
+      for (j = 0; j < _tcslen(TempString); j++) {
+        if (TempString[j] > 0x20) {
+          hasDetails = true;
+          break;
+        }
+      }
 
-	  if (_tcslen(Details)+_tcslen(CleanString)+3<DETAILS_LENGTH) {
-	    _tcscat(Details,CleanString);
-	    _tcscat(Details,TEXT("\r\n"));
-	  }
-	}
+      // first hasDetails set true for rest of details
+      if (hasDetails == true) {
+        // Remove carriage returns
+        for (j = 0, n = 0; j < _tcslen(TempString); j++) {
+          if (TempString[j] == 0x0d)
+            continue;
+          CleanString[n++] = TempString[j];
+        }
+        CleanString[n] = '\0';
+
+        if (_tcslen(Details) + _tcslen(CleanString) + 3 < DETAILS_LENGTH) {
+          _tcscat(Details, CleanString);
+          _tcscat(Details, TEXT("\r\n"));
+        }
       }
     }
+  }
 
   if (inDetails) {
     LookupAirfieldDetail(Name, Details);
   }
-
 }
 
-
+/**
+ * Opens the airfield details file and parses it
+ */
 void ReadAirfieldFile() {
-
   StartupStore(TEXT("ReadAirfieldFile\n"));
-
   XCSoarInterface::CreateProgressDialog(gettext(TEXT("Loading Airfield Details File...")));
 
-  {
-    OpenAirfieldDetails();
-    ParseAirfieldDetails();
-    CloseAirfieldDetails();
-  }
-
+  OpenAirfieldDetails();
+  ParseAirfieldDetails();
+  CloseAirfieldDetails();
 }
-

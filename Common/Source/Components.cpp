@@ -110,13 +110,13 @@ void XCSoarInterface::PreloadInitialisation(bool ask) {
   ReadLanguageFile();
 #endif
 
-  // Registery (early)
+  // Registry (early)
 
   if (ask) {
     Profile::RestoreRegistry();
     Profile::ReadRegistrySettings();
 
-    //    CreateProgressDialog(gettext(TEXT("Initialising")));
+    // CreateProgressDialog(gettext(TEXT("Initialising")));
 
   } else {
     dlgStartupShowModal();
@@ -144,6 +144,7 @@ void XCSoarInterface::AfterStartup() {
     return;
   }
   first = false;
+
   StartupStore(TEXT("ProgramStarted=3\n"));
   StartupLogFreeRamAndStorage();
 
@@ -206,6 +207,12 @@ void XCSoarInterface::StartupInfo() {
 #endif
 }
 
+// NEWTASK
+#ifdef NEWTASK
+extern int test_newtask(int test_num);
+#endif
+
+
 /**
  * "Boots" up XCSoar
  * @param hInstance Instance handle
@@ -235,10 +242,6 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
   MainWindow::register_class(hInst);
   MapWindow::register_class(hInst);
 
-  //######################
-  //   other startup...
-  //######################
-
   // Fill the fast(co)sine table
   InitSineTable();
 
@@ -247,9 +250,8 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
   // Send the SettingsMap to the DeviceBlackboard
   SendSettingsMap();
 
-  // Write to log file
+  // Creates the main window
   StartupStore(TEXT("Create main window\n"));
-
   RECT WindowSize = SystemWindowSize();
   main_window.set(szTitle,
 		  WindowSize.left, WindowSize.top,
@@ -267,16 +269,10 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
   marks = new Marks("xcsoar-marks");
   topology = new TopologyStore(marks->GetTopology());
 
-  // create map window
-
-  // Write to log file
+  // Show the main and map windows
   StartupStore(TEXT("Create map window\n"));
-
-  // initial show
   main_window.show();
   main_window.map.show();
-
-  // other initialization...
 
 #ifdef HAVE_ACTIVATE_INFO
   SHSetAppKeyWndAssoc(VK_APP1, main_window);
@@ -296,39 +292,55 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
   task.ClearTask();
   glide_computer.Initialise();
   logger.LinkGRecordDLL(); // try to link DLL if it exists
+
+  // Load the EGM96 geoid data
   OpenGeoid();
 
   PreloadInitialisation(false);
 
   Profile::LoadWindFromRegistry();
+
+  // TODO TB: seems to be out of date?!
   CalculateNewPolarCoef();
-  // Write to log file
+
+  // Calculate polar-related data and saves it to the cache
   StartupStore(TEXT("GlidePolar::UpdatePolar\n"));
   GlidePolar::UpdatePolar(false, SettingsComputer());
 
+  // Show startup info depending on device
   StartupInfo();
 
+  // Read the topology file(s)
   topology->Open();
+
+  // Read the terrain file
   terrain.OpenTerrain();
 
+  // Read the waypoint files
   ReadWayPoints(way_points, terrain);
 
+  // Read and parse the airfield info file
   ReadAirfieldFile();
+
+  // Set the home waypoint
   SetHome(way_points, terrain, SetSettingsComputer(), false, true);
 
-  // need to re-synchronise blackboards here since SetHome touches them
+  // ReSynchronise the blackboards here since SetHome touches them
   ReadBlackboardBasic(device_blackboard.Basic());
 
   terrain.ServiceFullReload(Basic().Location);
 
-  // Write to log file
+  // Scan for weather forecast
   CreateProgressDialog(gettext(TEXT("Scanning weather forecast")));
   StartupStore(TEXT("RASP load\n"));
   RASP.ScanAll(Basic().Location);
 
+  // Reads the airspace files
   ReadAirspace();
+  // Sorts the airspaces by priority
   SortAirspace();
 
+  // Read the FLARM details file
   OpenFLARMDetails();
 
 #ifndef DISABLEAUDIOVARIO
@@ -341,46 +353,80 @@ bool XCSoarInterface::Startup(HINSTANCE hInstance, LPTSTR lpCmdLine)
   */
 #endif
 
+  // Start the device thread(s)
   CreateProgressDialog(gettext(TEXT("Starting devices")));
   devStartup(lpCmdLine);
 
-  // re-set polar in case devices need the data
-  // Write to log file
+  // Reset polar in case devices need the data
   StartupStore(TEXT("GlidePolar::UpdatePolar\n"));
   GlidePolar::UpdatePolar(true, SettingsComputer());
 
   CreateProgressDialog(gettext(TEXT("Initialising display")));
 
   // Finally ready to go.. all structures must be present before this.
-  // Write to log file
+
+  // Create the drawing thread
   StartupStore(TEXT("CreateDrawingThread\n"));
   draw_thread = new DrawThread(main_window.map, main_window.flarm);
   draw_thread->start();
 
-  // Write to log file
+  // Show the infoboxes
   StartupStore(TEXT("ShowInfoBoxes\n"));
   InfoBoxManager::Show();
 
-  // Write to log file
+  // Create the calculation thread
   StartupStore(TEXT("CreateCalculationThread\n"));
   CreateCalculationThread();
 
-  // Write to log file
+#ifdef NEWTASK  
+  { // NEWTASK
+    PeriodClock t;
+    t.reset(); t.update();
+    CreateProgressDialog(gettext(TEXT("Running test 0")));
+    test_newtask(0);
+    StartupStore(TEXT("test 0 %d\n"),t.elapsed());
+
+    /*
+    t.update();
+    CreateProgressDialog(gettext(TEXT("Running test 1")));
+    test_newtask(1);
+    StartupStore(TEXT("test 1 %d\n"),t.elapsed());
+
+    t.update();
+    CreateProgressDialog(gettext(TEXT("Running test 2")));
+    test_newtask(2);
+    StartupStore(TEXT("test 2 %d\n"),t.elapsed());
+
+    t.update();
+    CreateProgressDialog(gettext(TEXT("Running test 3")));
+    test_newtask(3);
+    StartupStore(TEXT("test 3 %d\n"),t.elapsed());
+
+    t.update();
+    CreateProgressDialog(gettext(TEXT("Running test 4")));
+    test_newtask(4);
+    StartupStore(TEXT("test 4 %d\n"),t.elapsed());
+    */
+    CreateProgressDialog(gettext(TEXT("test complete")));
+  }
+#endif
+
+  // Initialise the airspace warning dialog
   StartupStore(TEXT("dlgAirspaceWarningInit\n"));
   dlgAirspaceWarningInit();
 
-  // find unique ID of this PDA
+  // Find unique ID of this PDA
   ReadAssetNumber();
 
-  // Da-da, start everything now
-  // Write to log file
   StartupStore(TEXT("ProgramStarted\n"));
 
-  // map gets initial focus
+  // Give focus to the map
   main_window.map.set_focus();
 
-  // start threads running
+  // Start calculation thread
   calculation_thread->start();
+
+  // Start instrument thread
   instrument_thread->start();
 
   globalRunningEvent.trigger();
